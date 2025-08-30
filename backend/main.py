@@ -15,6 +15,7 @@ from pydantic import BaseModel
 
 from app.server import ProviderManager, ConnectionManager, WebSocketMessage, MessageType
 from app.server.models import ProviderInfo, MatchListResponse, MatchDetailResponse
+from app.aggregator import AggregatorService
 from app.config import Settings
 
 # Configure logging
@@ -30,6 +31,7 @@ settings = Settings()
 # Global managers
 provider_manager = ProviderManager(logger)
 connection_manager = ConnectionManager(logger)
+aggregator_service = AggregatorService(provider_manager, logger)
 
 
 @asynccontextmanager
@@ -48,8 +50,12 @@ async def lifespan(app: FastAPI):
     # Connect to all providers
     await provider_manager.connect_all()
     
+    # Initialize aggregator service
+    await aggregator_service.initialize()
+    
     # Start monitoring
     await provider_manager.start_monitoring()
+    await aggregator_service.start_monitoring()
     
     # Start WebSocket ping interval
     await connection_manager.start_ping_interval()
@@ -74,6 +80,31 @@ async def lifespan(app: FastAPI):
     
     provider_manager.add_update_callback(broadcast_updates)
     
+    # Set up aggregator callbacks
+    async def broadcast_aggregator_updates(data):
+        """Broadcast aggregator updates to WebSocket clients."""
+        update_type = data.get("type")
+        
+        if update_type == "arbitrage_alert":
+            message = WebSocketMessage(
+                type=MessageType.ARBITRAGE_ALERT,
+                data=data,
+                timestamp=datetime.now()
+            )
+            await connection_manager.broadcast(message)
+        elif update_type in ["price_update", "score_update"]:
+            message = WebSocketMessage(
+                type=MessageType.UNIFIED_UPDATE,
+                data=data,
+                timestamp=datetime.now()
+            )
+            # Broadcast to subscribers of this match
+            if data.get("match"):
+                match_id = data["match"]["match_id"]
+                await connection_manager.broadcast_to_subscribers(match_id, message)
+    
+    aggregator_service.add_update_callback(broadcast_aggregator_updates)
+    
     logger.info("Server started successfully")
     
     yield
@@ -83,6 +114,7 @@ async def lifespan(app: FastAPI):
     
     # Stop monitoring
     await provider_manager.stop_monitoring()
+    await aggregator_service.stop_monitoring()
     
     # Stop WebSocket ping
     await connection_manager.stop_ping_interval()
@@ -254,6 +286,99 @@ async def get_match_details(match_id: str):
         providers=details.get("providers", []),
         timestamp=datetime.now()
     )
+
+
+# Aggregation endpoints
+@app.get("/api/unified/matches")
+async def get_unified_matches(
+    status: Optional[str] = Query(None, description="Filter by status: live, upcoming, completed"),
+    with_arbitrage: bool = Query(False, description="Only show matches with arbitrage opportunities")
+):
+    """
+    Get unified matches aggregated from all providers.
+    
+    Returns matches with best prices, data quality indicators, and arbitrage opportunities.
+    """
+    matches = aggregator_service.get_unified_matches(status=status, with_arbitrage=with_arbitrage)
+    
+    return {
+        "matches": [match.to_dict() for match in matches],
+        "total": len(matches),
+        "timestamp": datetime.now().isoformat()
+    }
+
+
+@app.get("/api/unified/match/{unified_id}")
+async def get_unified_match_details(unified_id: str):
+    """
+    Get detailed unified match information including provider comparison.
+    
+    Args:
+        unified_id: Unified match identifier
+        
+    Returns:
+        Detailed match with price comparison, arbitrage opportunities, and data quality
+    """
+    if unified_id not in aggregator_service.unified_matches:
+        raise HTTPException(status_code=404, detail=f"Unified match {unified_id} not found")
+    
+    unified_match = aggregator_service.unified_matches[unified_id]
+    comparison = aggregator_service.get_provider_comparison(unified_id)
+    
+    return {
+        "match": unified_match.to_dict(),
+        "comparison": comparison,
+        "timestamp": datetime.now().isoformat()
+    }
+
+
+@app.get("/api/arbitrage")
+async def get_arbitrage_opportunities(
+    active_only: bool = Query(True, description="Only show currently active opportunities")
+):
+    """
+    Get arbitrage opportunities across providers.
+    
+    Returns opportunities with profit percentages, recommended stakes, and risk levels.
+    """
+    opportunities = aggregator_service.get_arbitrage_opportunities(active_only=active_only)
+    
+    return {
+        "opportunities": [
+            {
+                "match_id": opp.match_id,
+                "type": opp.type,
+                "player": opp.player,
+                "back_provider": opp.back_provider,
+                "back_price": opp.back_price,
+                "lay_provider": opp.lay_provider,
+                "lay_price": opp.lay_price,
+                "profit_percentage": opp.profit_percentage,
+                "risk_level": opp.risk_level,
+                "confidence": opp.confidence,
+                "discovered_at": opp.discovered_at.isoformat(),
+                "is_valid": opp.is_valid()
+            }
+            for opp in opportunities
+        ],
+        "total": len(opportunities),
+        "timestamp": datetime.now().isoformat()
+    }
+
+
+@app.get("/api/provider-comparison/{unified_id}")
+async def get_provider_comparison(unified_id: str):
+    """
+    Get detailed provider comparison for a specific match.
+    
+    Shows price differences, data quality, and best prices from each provider.
+    """
+    comparison = aggregator_service.get_provider_comparison(unified_id)
+    
+    if not comparison:
+        raise HTTPException(status_code=404, detail=f"No comparison data for match {unified_id}")
+    
+    return comparison
 
 
 # WebSocket endpoint

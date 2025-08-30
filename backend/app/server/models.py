@@ -17,6 +17,12 @@ class MessageType(Enum):
     PONG = "pong"
     SUBSCRIPTION = "subscription"
     UNSUBSCRIPTION = "unsubscription"
+    # Aggregation message types
+    UNIFIED_UPDATE = "unified_update"  # Merged data from all providers
+    PROVIDER_UPDATE = "provider_update"  # Provider-specific updates
+    ARBITRAGE_ALERT = "arbitrage_alert"  # Cross-provider opportunities
+    PRICE_COMPARISON = "price_comparison"  # Price comparison across providers
+    DATA_QUALITY = "data_quality"  # Data quality indicators
 
 
 class WebSocketMessage(BaseModel):
