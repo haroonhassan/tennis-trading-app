@@ -6,6 +6,7 @@ from datetime import datetime
 from dataclasses import dataclass
 import logging
 from .models import StreamMessage, StreamConfig, MarketPrices, StreamStatus
+from .tennis_models import TennisMatch, TennisScore, MatchStatistics, Player
 
 
 @dataclass
@@ -118,30 +119,85 @@ class BaseDataProvider(ABC):
         pass
     
     @abstractmethod
-    def get_match_scores(self, match_id: str) -> Optional[Score]:
+    def get_tennis_matches(self, status: Optional[str] = None) -> List[TennisMatch]:
         """
-        Get current score for a match.
+        Get tennis matches with normalized data.
         
         Args:
-            match_id: Match identifier
+            status: Optional filter by status (live, upcoming, completed)
             
         Returns:
-            Score object or None if not available
+            List of normalized TennisMatch objects
         """
         pass
     
     @abstractmethod
-    def get_match_stats(self, match_id: str) -> Optional[MatchStats]:
+    def get_match_score(self, match_id: str) -> Optional[TennisScore]:
         """
-        Get statistics for a match.
+        Get current tennis match score.
         
         Args:
             match_id: Match identifier
             
         Returns:
-            MatchStats object or None if not available
+            TennisScore object or None if not available
         """
         pass
+    
+    @abstractmethod
+    def get_match_statistics(self, match_id: str) -> Optional[MatchStatistics]:
+        """
+        Get tennis match statistics.
+        
+        Args:
+            match_id: Match identifier
+            
+        Returns:
+            MatchStatistics object or None if not available
+        """
+        pass
+    
+    @abstractmethod
+    def get_serving_player(self, match_id: str) -> Optional[Player]:
+        """
+        Get current serving player.
+        
+        Args:
+            match_id: Match identifier
+            
+        Returns:
+            Player object of current server or None
+        """
+        pass
+    
+    # Legacy methods for backward compatibility
+    def get_match_scores(self, match_id: str) -> Optional[Score]:
+        """Legacy method - use get_match_score instead."""
+        score = self.get_match_score(match_id)
+        if score:
+            # Convert to old Score format if needed
+            return Score(
+                match_id=match_id,
+                home_score={},
+                away_score={},
+                current_set=score.current_set,
+                server=score.server.name if score.server else None,
+                timestamp=score.timestamp
+            )
+        return None
+    
+    def get_match_stats(self, match_id: str) -> Optional[MatchStats]:
+        """Legacy method - use get_match_statistics instead."""
+        stats = self.get_match_statistics(match_id)
+        if stats:
+            # Convert to old MatchStats format if needed
+            return MatchStats(
+                match_id=match_id,
+                home_stats={},
+                away_stats={},
+                timestamp=stats.timestamp
+            )
+        return None
     
     @abstractmethod
     def get_account_balance(self) -> Dict[str, float]:

@@ -20,6 +20,8 @@ from .base import (
 )
 from .models import StreamMessage, StreamConfig, StreamStatus
 from .betfair_stream import BetfairStreamClient
+from .tennis_models import TennisMatch, TennisScore, MatchStatistics, Player, MatchStatus
+from .normalizer import MatchNormalizer
 
 
 class BetfairProvider(BaseDataProvider):
@@ -63,6 +65,9 @@ class BetfairProvider(BaseDataProvider):
         # Streaming
         self.stream_client = None
         self._stream_callback = None
+        
+        # Tennis data
+        self.normalizer = MatchNormalizer(logger)
         
     def _validate_config(self):
         """Validate required configuration is present."""
@@ -599,3 +604,160 @@ class BetfairProvider(BaseDataProvider):
         if self.stream_client:
             return self.stream_client.get_status()
         return StreamStatus.DISCONNECTED
+    
+    # ============== Tennis Score/Stats Methods ==============
+    
+    def get_tennis_matches(self, status: Optional[str] = None) -> List[TennisMatch]:
+        """
+        Get tennis matches with normalized data.
+        
+        Args:
+            status: Filter by status (live, upcoming, completed)
+            
+        Returns:
+            List of normalized TennisMatch objects
+        """
+        if not self.is_authenticated:
+            self.logger.error("Not authenticated")
+            return []
+        
+        try:
+            # Build filter based on status
+            market_filter = filters.market_filter(
+                event_type_ids=[self.TENNIS_EVENT_TYPE_ID],
+                market_type_codes=["MATCH_ODDS"]
+            )
+            
+            if status == "live":
+                market_filter["inPlayOnly"] = True
+            elif status == "upcoming":
+                market_filter["inPlayOnly"] = False
+                market_filter["marketStartTime"] = {
+                    "from": datetime.now().isoformat(),
+                    "to": (datetime.now() + timedelta(days=1)).isoformat()
+                }
+            
+            # Get markets
+            markets = self.client.betting.list_market_catalogue(
+                filter=market_filter,
+                market_projection=["EVENT", "MARKET_START_TIME", "RUNNER_DESCRIPTION", "COMPETITION"],
+                max_results=100
+            )
+            
+            # Normalize to TennisMatch objects
+            tennis_matches = []
+            for market in markets:
+                match = self.normalizer.normalize_match("betfair", market)
+                if match:
+                    tennis_matches.append(match)
+            
+            self.logger.info(f"Found {len(tennis_matches)} tennis matches")
+            return tennis_matches
+            
+        except BetfairError as e:
+            self.logger.error(f"Error getting tennis matches: {e}")
+            return []
+    
+    def get_match_score(self, match_id: str) -> Optional[TennisScore]:
+        """
+        Get current tennis match score.
+        
+        Note: Betfair doesn't provide detailed score data through the standard API.
+        This would need to be sourced from a separate scores feed or scraped.
+        
+        Args:
+            match_id: Match identifier
+            
+        Returns:
+            TennisScore or None
+        """
+        if not self.is_authenticated:
+            return None
+        
+        try:
+            # Try to get score from market data
+            # In reality, Betfair doesn't provide scores through the betting API
+            # This is a placeholder showing the structure
+            
+            # For demo purposes, create a mock score based on market odds
+            market_books = self.client.betting.list_market_book(
+                market_ids=[match_id.replace("betfair_", "")],
+                price_projection=filters.price_projection(price_data=["EX_BEST_OFFERS"])
+            )
+            
+            if market_books:
+                market_book = market_books[0]
+                
+                # Get runner names from catalog
+                market_filter = filters.market_filter(market_ids=[market_book.get("marketId")])
+                markets = self.client.betting.list_market_catalogue(
+                    filter=market_filter,
+                    market_projection=["RUNNER_DESCRIPTION"],
+                    max_results=1
+                )
+                
+                if markets:
+                    market = markets[0]
+                    runners = market.get("runners", [])
+                    
+                    player1 = Player(
+                        id=str(runners[0].get("selectionId")) if runners else "1",
+                        name=runners[0].get("runnerName", "Player 1") if runners else "Player 1"
+                    )
+                    player2 = Player(
+                        id=str(runners[1].get("selectionId")) if runners else "2",
+                        name=runners[1].get("runnerName", "Player 2") if len(runners) > 1 else "Player 2"
+                    )
+                    
+                    # Create basic score structure
+                    score = TennisScore(
+                        match_id=match_id,
+                        player1=player1,
+                        player2=player2,
+                        match_status=MatchStatus.IN_PROGRESS if market_book.get("inplay") else MatchStatus.NOT_STARTED
+                    )
+                    
+                    # Note: Actual score data would need to come from a different source
+                    self.logger.warning(f"Score data not available from Betfair API for match {match_id}")
+                    return score
+            
+            return None
+            
+        except Exception as e:
+            self.logger.error(f"Error getting match score: {e}")
+            return None
+    
+    def get_match_statistics(self, match_id: str) -> Optional[MatchStatistics]:
+        """
+        Get tennis match statistics.
+        
+        Note: Betfair doesn't provide match statistics through the API.
+        
+        Args:
+            match_id: Match identifier
+            
+        Returns:
+            MatchStatistics or None
+        """
+        self.logger.warning(f"Statistics not available from Betfair API for match {match_id}")
+        return None
+    
+    def get_serving_player(self, match_id: str) -> Optional[Player]:
+        """
+        Get current serving player.
+        
+        Note: Betfair doesn't provide serving data through the API.
+        
+        Args:
+            match_id: Match identifier
+            
+        Returns:
+            Player or None
+        """
+        # Try to get from score if available
+        score = self.get_match_score(match_id)
+        if score and score.server:
+            return score.server
+        
+        self.logger.warning(f"Serving player data not available from Betfair API for match {match_id}")
+        return None
