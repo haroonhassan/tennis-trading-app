@@ -16,8 +16,7 @@ class Settings(BaseSettings):
     BETFAIR_USERNAME: Optional[str] = None
     BETFAIR_PASSWORD: Optional[str] = None
     BETFAIR_APP_KEY: Optional[str] = None
-    BETFAIR_CERT_PATH: Optional[str] = None
-    BETFAIR_KEY_PATH: Optional[str] = None
+    BETFAIR_CERT_FILE: Optional[str] = None
     
     # Database Settings
     DATABASE_URL: str = "sqlite:///./tennis_trading.db"
