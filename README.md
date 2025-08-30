@@ -1,15 +1,16 @@
 # Tennis Trading App
 
-A real-time tennis trading application that integrates with Betfair's Exchange API to provide live odds streaming, automated trading capabilities, and comprehensive match analytics.
+A real-time tennis trading application with an extensible data provider architecture, currently supporting Betfair Exchange API with plans for additional betting exchanges. Provides live odds streaming, automated trading capabilities, and comprehensive match analytics.
 
 ## Architecture Overview
 
 The application follows a microservices architecture with clear separation of concerns:
 
-- **Python Backend**: FastAPI-based server handling Betfair API integration, data processing, and trading logic
+- **Abstract Data Provider Layer**: Extensible interface for multiple betting exchanges
+- **Python Backend**: FastAPI-based server with pluggable provider architecture
 - **React Frontend**: Modern, responsive UI for monitoring matches and executing trades
 - **WebSocket Communication**: Real-time bidirectional communication between frontend and backend
-- **Streaming API**: Direct integration with Betfair's streaming endpoints for live data
+- **Provider Implementations**: Currently Betfair, easily extensible for Pinnacle, Smarkets, etc.
 
 ## Prerequisites
 
@@ -26,27 +27,29 @@ The application follows a microservices architecture with clear separation of co
    cd tennis-trading-app
    ```
 
-2. **Set up the backend**
+2. **Set up environment**
    ```bash
-   make setup-backend
-   source backend/venv/bin/activate
-   cp backend/.env.example backend/.env
-   # Edit backend/.env with your Betfair credentials
+   cp .env.example .env
+   # Edit .env with your Betfair credentials (username, password, app_key, cert_file)
    ```
 
-3. **Install frontend dependencies**
+3. **Install dependencies**
    ```bash
-   cd frontend
-   npm install
+   make install  # Installs both backend and frontend dependencies
    ```
 
-4. **Run the application**
+4. **Test Betfair connection**
    ```bash
-   # Terminal 1: Backend
-   make run-backend
+   python scripts/test_providers.py
+   ```
+
+5. **Run the application**
+   ```bash
+   make dev  # Runs both backend and frontend
    
-   # Terminal 2: Frontend
-   cd frontend && npm start
+   # Or separately:
+   # Terminal 1: make dev-backend
+   # Terminal 2: make dev-frontend
    ```
 
 ## Project Structure
@@ -58,8 +61,12 @@ tennis-trading-app/
 │   │   ├── api/            # API endpoints
 │   │   ├── core/           # Core functionality
 │   │   ├── models/         # Data models
+│   │   ├── providers/      # Data provider implementations
+│   │   │   ├── base.py     # Abstract base provider
+│   │   │   ├── betfair.py  # Betfair implementation
+│   │   │   └── factory.py  # Provider factory
 │   │   ├── services/       # Business logic
-│   │   └── streaming/      # Betfair streaming integration
+│   │   └── utils/          # Utility functions
 │   ├── tests/              # Test suite
 │   ├── requirements.txt    # Python dependencies
 │   └── .env.example        # Environment variables template
@@ -72,9 +79,41 @@ tennis-trading-app/
 │   ├── betfair-setup.md   # Betfair API setup guide
 │   └── development.md     # Development guidelines
 ├── scripts/                # Utility scripts
-│   └── setup_backend.sh   # Backend setup automation
+│   ├── test_betfair_connection.py  # Betfair connection test
+│   └── test_providers.py           # Provider testing script
 ├── Makefile               # Common commands
 └── README.md              # This file
+```
+
+## Data Provider Architecture
+
+The application uses an abstract provider pattern to support multiple betting exchanges:
+
+### BaseDataProvider Interface
+- `authenticate()` - Handle provider authentication
+- `get_live_matches()` - Fetch current live matches
+- `subscribe_to_prices()` - Real-time price subscriptions
+- `get_match_scores()` - Current match scores
+- `get_match_stats()` - Match statistics
+- `place_bet()` / `cancel_bet()` - Trading operations
+- `get_account_balance()` - Account information
+
+### Current Implementations
+- **BetfairProvider**: Full integration with Betfair Exchange API
+  - Non-interactive login with .pem certificate
+  - Automatic session management
+  - Lightweight mode for performance
+
+### Adding New Providers
+```python
+from app.providers import BaseDataProvider, DataProviderFactory
+
+class NewProvider(BaseDataProvider):
+    # Implement required methods
+    pass
+
+# Register with factory
+DataProviderFactory.register_provider("new_provider", NewProvider)
 ```
 
 ## Technology Stack
@@ -101,34 +140,46 @@ tennis-trading-app/
 
 ## Development Roadmap
 
-- [ ] **Phase 1: Betfair Authentication**
-  - [ ] Implement certificate-based authentication
-  - [ ] Session management and token refresh
-  - [ ] Connection pooling and retry logic
+### ✅ Completed
+- [x] **Phase 1: Data Provider Architecture**
+  - [x] Abstract BaseDataProvider interface
+  - [x] Betfair provider implementation
+  - [x] Provider factory pattern
+  - [x] Certificate-based authentication (.pem file)
+  - [x] Session management with auto keep-alive
+  - [x] Connection testing and validation
 
-- [ ] **Phase 2: Streaming API Integration**
-  - [ ] Market data streaming
+### 🚧 In Progress
+- [ ] **Phase 2: Streaming & Real-time Data**
+  - [ ] Betfair streaming API integration
+  - [ ] WebSocket server for frontend
+  - [ ] Real-time price updates
   - [ ] Order stream subscription
-  - [ ] Heartbeat and connection management
-  - [ ] Data parsing and normalization
 
-- [ ] **Phase 3: Backend Server Setup**
-  - [ ] REST API endpoints
-  - [ ] WebSocket server implementation
-  - [ ] Data models and validation
-  - [ ] Business logic layer
+- [ ] **Phase 3: Backend API Development**
+  - [ ] FastAPI REST endpoints
+  - [ ] WebSocket handlers
+  - [ ] Data aggregation services
+  - [ ] Trading execution layer
 
+### 📋 Planned
 - [ ] **Phase 4: React Frontend**
   - [ ] Component architecture
   - [ ] Real-time data display
   - [ ] Trading interface
-  - [ ] Performance optimization
+  - [ ] Performance dashboards
 
-- [ ] **Phase 5: Advanced Features**
+- [ ] **Phase 5: Additional Providers**
+  - [ ] Pinnacle Sports integration
+  - [ ] Smarkets provider
+  - [ ] Betdaq support
+  - [ ] Unified data model
+
+- [ ] **Phase 6: Advanced Features**
   - [ ] Automated trading strategies
   - [ ] Backtesting framework
   - [ ] Risk management tools
-  - [ ] Performance analytics
+  - [ ] ML-based predictions
 
 ## Contributing
 
