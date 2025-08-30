@@ -49,7 +49,29 @@ The application follows a microservices architecture with clear separation of co
    python ../scripts/test_streaming_simulated.py
    ```
 
-6. **Run the application**
+6. **Run tennis scores service test**
+   ```bash
+   cd backend && source venv/bin/activate
+   python ../scripts/test_tennis_scores.py
+   ```
+
+7. **Run the FastAPI server**
+   ```bash
+   cd backend && source venv/bin/activate
+   python ../scripts/run_server.py
+   # Server will run on http://localhost:8000
+   # API docs available at http://localhost:8000/docs
+   # WebSocket endpoint at ws://localhost:8000/ws
+   ```
+
+8. **Test WebSocket connection**
+   ```bash
+   # In another terminal
+   cd backend && source venv/bin/activate
+   python ../scripts/test_websocket.py
+   ```
+
+9. **Run the application**
    ```bash
    make dev  # Runs both backend and frontend
    
@@ -188,31 +210,48 @@ DataProviderFactory.register_provider("new_provider", NewProvider)
   - [x] Price movement tracking and indicators
   - [x] Auto-reconnection and heartbeat management
   - [x] Polling fallback for demonstration
-  - [ ] WebSocket server for frontend (pending)
+  - [x] WebSocket server for frontend
   - [ ] Order stream subscription (pending)
+
+- [x] **Phase 3: Tennis Data Service**
+  - [x] Comprehensive tennis data models
+  - [x] Match score tracking
+  - [x] Statistics aggregation
+  - [x] Provider-agnostic caching layer
+  - [x] Automatic update scheduler
+  - [x] Match normalization across providers
+
+- [x] **Phase 4: FastAPI Server & Multi-Provider Support**
+  - [x] FastAPI REST endpoints
+  - [x] WebSocket handlers with ConnectionManager
+  - [x] ProviderManager for multi-source aggregation
+  - [x] Provider failover and health monitoring
+  - [x] Real-time broadcast to WebSocket clients
+  - [x] CORS middleware configuration
+  - [x] API documentation (auto-generated at /docs)
+  - [x] WebSocket test client
 
 ### 🚧 In Progress
 
-- [ ] **Phase 3: Backend API Development**
-  - [ ] FastAPI REST endpoints
-  - [ ] WebSocket handlers
-  - [ ] Data aggregation services
+- [ ] **Phase 5: Backend API Development**
   - [ ] Trading execution layer
+  - [ ] Advanced order management
+  - [ ] Position tracking
 
 ### 📋 Planned
-- [ ] **Phase 4: React Frontend**
+- [ ] **Phase 6: React Frontend**
   - [ ] Component architecture
   - [ ] Real-time data display
   - [ ] Trading interface
   - [ ] Performance dashboards
 
-- [ ] **Phase 5: Additional Providers**
+- [ ] **Phase 7: Additional Providers**
   - [ ] Pinnacle Sports integration
   - [ ] Smarkets provider
   - [ ] Betdaq support
   - [ ] Unified data model
 
-- [ ] **Phase 6: Advanced Features**
+- [ ] **Phase 8: Advanced Features**
   - [ ] Automated trading strategies
   - [ ] Backtesting framework
   - [ ] Risk management tools
