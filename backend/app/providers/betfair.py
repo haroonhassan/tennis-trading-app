@@ -1,0 +1,490 @@
+"""Betfair data provider implementation."""
+
+import os
+import logging
+from typing import Dict, List, Optional, Any, Callable
+from datetime import datetime, timedelta
+import threading
+from dataclasses import dataclass
+
+from betfairlightweight import APIClient
+from betfairlightweight.exceptions import BetfairError
+from betfairlightweight import filters
+
+from .base import (
+    BaseDataProvider, 
+    Match, 
+    PriceData, 
+    Score, 
+    MatchStats
+)
+
+
+class BetfairProvider(BaseDataProvider):
+    """Betfair betting exchange data provider."""
+    
+    TENNIS_EVENT_TYPE_ID = "2"  # Tennis sport ID in Betfair
+    
+    def __init__(self, logger: Optional[logging.Logger] = None):
+        """Initialize Betfair provider."""
+        super().__init__(logger)
+        
+        # Load credentials from environment
+        self.username = os.getenv("BETFAIR_USERNAME")
+        self.password = os.getenv("BETFAIR_PASSWORD")
+        self.app_key = os.getenv("BETFAIR_APP_KEY")
+        self.cert_file = os.getenv("BETFAIR_CERT_FILE")
+        
+        # Validate configuration
+        self._validate_config()
+        
+        # Initialize API client
+        # For a single .pem file, use cert_files parameter
+        self.client = APIClient(
+            username=self.username,
+            password=self.password,
+            app_key=self.app_key,
+            cert_files=self.cert_file,  # Single .pem file
+            lightweight=True
+        )
+        
+        # Session management
+        self.last_keep_alive = None
+        self.keep_alive_interval = 600  # 10 minutes
+        self._keep_alive_thread = None
+        self._stop_keep_alive = threading.Event()
+        
+        # Price subscription management
+        self._price_subscriptions = {}
+        self._price_callback = None
+        
+    def _validate_config(self):
+        """Validate required configuration is present."""
+        missing = []
+        
+        if not self.username:
+            missing.append("BETFAIR_USERNAME")
+        if not self.password:
+            missing.append("BETFAIR_PASSWORD")
+        if not self.app_key:
+            missing.append("BETFAIR_APP_KEY")
+        if not self.cert_file:
+            missing.append("BETFAIR_CERT_FILE")
+        elif not os.path.exists(self.cert_file):
+            raise FileNotFoundError(f"Certificate file not found: {self.cert_file}")
+            
+        if missing:
+            raise ValueError(f"Missing required environment variables: {', '.join(missing)}")
+    
+    def authenticate(self) -> bool:
+        """
+        Authenticate with Betfair using Non-Interactive login.
+        
+        Returns:
+            bool: True if authentication successful
+        """
+        try:
+            # Login using certificate authentication
+            self.client.login()
+            
+            self.is_authenticated = True
+            self.session_token = self.client.session_token
+            self.last_keep_alive = datetime.now()
+            
+            # Start keep-alive thread
+            self._start_keep_alive_thread()
+            
+            self.logger.info(f"Successfully authenticated with Betfair. Session token: {self.session_token[:20]}...")
+            return True
+            
+        except BetfairError as e:
+            self.logger.error(f"Betfair authentication failed: {e}")
+            return False
+        except Exception as e:
+            self.logger.error(f"Unexpected error during authentication: {e}")
+            return False
+    
+    def _start_keep_alive_thread(self):
+        """Start background thread to keep session alive."""
+        if self._keep_alive_thread and self._keep_alive_thread.is_alive():
+            return
+            
+        self._stop_keep_alive.clear()
+        self._keep_alive_thread = threading.Thread(target=self._keep_alive_worker)
+        self._keep_alive_thread.daemon = True
+        self._keep_alive_thread.start()
+    
+    def _keep_alive_worker(self):
+        """Background worker to maintain session."""
+        while not self._stop_keep_alive.is_set():
+            try:
+                # Wait for interval or stop signal
+                if self._stop_keep_alive.wait(self.keep_alive_interval):
+                    break
+                    
+                # Send keep alive
+                if self.is_authenticated:
+                    self.keep_alive()
+                    
+            except Exception as e:
+                self.logger.error(f"Keep-alive error: {e}")
+    
+    def get_live_matches(self, sport: str = "tennis") -> List[Match]:
+        """
+        Get list of live tennis matches.
+        
+        Returns:
+            List of Match objects
+        """
+        if not self.is_authenticated:
+            self.logger.error("Not authenticated")
+            return []
+            
+        try:
+            # Create filter for in-play tennis matches
+            market_filter = filters.market_filter(
+                event_type_ids=[self.TENNIS_EVENT_TYPE_ID],
+                market_type_codes=["MATCH_ODDS"],
+                in_play_only=True
+            )
+            
+            # Get markets
+            markets = self.client.betting.list_market_catalogue(
+                filter=market_filter,
+                market_projection=["EVENT", "MARKET_START_TIME", "RUNNER_DESCRIPTION", "COMPETITION"],
+                max_results=100
+            )
+            
+            matches = []
+            for market in markets:
+                # Parse player names from runners (dict format due to lightweight=True)
+                runners = market.get('runners', [])
+                home_player = runners[0].get('runnerName', 'Unknown') if len(runners) > 0 else "Unknown"
+                away_player = runners[1].get('runnerName', 'Unknown') if len(runners) > 1 else "Unknown"
+                
+                event = market.get('event', {})
+                competition = market.get('competition', {})
+                
+                match = Match(
+                    id=market.get('marketId'),
+                    event_name=event.get('name', 'Unknown'),
+                    competition=competition.get('name', 'Unknown'),
+                    market_start_time=market.get('marketStartTime'),
+                    status="in-play" if market.get('inPlay') else "pre-match",
+                    home_player=home_player,
+                    away_player=away_player,
+                    metadata={
+                        "total_matched": market.get('totalMatched'),
+                        "event_id": event.get('id')
+                    }
+                )
+                matches.append(match)
+                
+            self.logger.info(f"Found {len(matches)} live tennis matches")
+            return matches
+            
+        except BetfairError as e:
+            self.logger.error(f"Error getting live matches: {e}")
+            return []
+    
+    def subscribe_to_prices(
+        self, 
+        market_ids: List[str], 
+        callback: Callable[[str, PriceData], None]
+    ) -> bool:
+        """
+        Subscribe to price updates for markets.
+        
+        Note: This is a polling implementation. For real-time streaming,
+        you would need to implement Betfair's Exchange Stream API.
+        """
+        if not self.is_authenticated:
+            self.logger.error("Not authenticated")
+            return False
+            
+        try:
+            self._price_callback = callback
+            
+            for market_id in market_ids:
+                if market_id not in self._price_subscriptions:
+                    self._price_subscriptions[market_id] = True
+                    self.logger.info(f"Subscribed to prices for market {market_id}")
+                    
+            # In a real implementation, you would start streaming here
+            # For now, we'll use polling in get_market_prices
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"Error subscribing to prices: {e}")
+            return False
+    
+    def unsubscribe_from_prices(self, market_ids: List[str]) -> bool:
+        """Unsubscribe from price updates."""
+        try:
+            for market_id in market_ids:
+                if market_id in self._price_subscriptions:
+                    del self._price_subscriptions[market_id]
+                    self.logger.info(f"Unsubscribed from market {market_id}")
+            return True
+        except Exception as e:
+            self.logger.error(f"Error unsubscribing: {e}")
+            return False
+    
+    def get_market_prices(self, market_id: str) -> Optional[List[PriceData]]:
+        """Get current prices for a market."""
+        if not self.is_authenticated:
+            return None
+            
+        try:
+            # Get market book with prices
+            price_projection = filters.price_projection(
+                price_data=['EX_BEST_OFFERS', 'EX_TRADED'],
+                ex_best_offers_overrides=filters.ex_best_offers_overrides(
+                    best_prices_depth=3
+                )
+            )
+            
+            market_books = self.client.betting.list_market_book(
+                market_ids=[market_id],
+                price_projection=price_projection
+            )
+            
+            if not market_books:
+                return None
+                
+            market_book = market_books[0]
+            price_data_list = []
+            
+            # Handle dict format due to lightweight=True
+            runners = market_book.get('runners', [])
+            
+            for runner in runners:
+                # Extract best back and lay prices
+                back_prices = []
+                lay_prices = []
+                
+                ex = runner.get('ex', {})
+                
+                if ex.get('availableToBack'):
+                    for price_size in ex['availableToBack']:
+                        back_prices.append({
+                            "price": price_size.get('price', 0),
+                            "size": price_size.get('size', 0)
+                        })
+                        
+                if ex.get('availableToLay'):
+                    for price_size in ex['availableToLay']:
+                        lay_prices.append({
+                            "price": price_size.get('price', 0),
+                            "size": price_size.get('size', 0)
+                        })
+                
+                price_data = PriceData(
+                    selection_id=str(runner.get('selectionId')),
+                    selection_name=str(runner.get('selectionId')),  # Name not available in lightweight mode
+                    back_prices=back_prices,
+                    lay_prices=lay_prices,
+                    last_price_traded=runner.get('lastPriceTraded'),
+                    total_matched=runner.get('totalMatched')
+                )
+                price_data_list.append(price_data)
+                
+                # Call callback if subscribed
+                if self._price_callback and market_id in self._price_subscriptions:
+                    self._price_callback(market_id, price_data)
+                    
+            return price_data_list
+            
+        except BetfairError as e:
+            self.logger.error(f"Error getting market prices: {e}")
+            return None
+    
+    def get_match_scores(self, match_id: str) -> Optional[Score]:
+        """
+        Get current score for a match.
+        
+        Note: Betfair doesn't provide detailed score data through the API.
+        This would typically come from a separate scores feed.
+        """
+        self.logger.warning("Score data not available through Betfair API")
+        return None
+    
+    def get_match_stats(self, match_id: str) -> Optional[MatchStats]:
+        """
+        Get statistics for a match.
+        
+        Note: Betfair doesn't provide detailed stats through the API.
+        """
+        self.logger.warning("Stats data not available through Betfair API")
+        return None
+    
+    def get_account_balance(self) -> Dict[str, float]:
+        """Get account balance information."""
+        if not self.is_authenticated:
+            self.logger.error("Not authenticated")
+            return {}
+            
+        try:
+            # Get account funds
+            account_funds = self.client.account.get_account_funds()
+            
+            # Handle dict format due to lightweight=True
+            return {
+                "available_balance": account_funds.get('availableToBetBalance', 0),
+                "exposure": account_funds.get('exposure', 0),
+                "exposure_limit": account_funds.get('exposureLimit', 0),
+                "retained_commission": account_funds.get('retainedCommission', 0),
+                "wallet": account_funds.get('wallet', 0)
+            }
+            
+        except BetfairError as e:
+            self.logger.error(f"Error getting account balance: {e}")
+            return {}
+    
+    def place_bet(
+        self,
+        market_id: str,
+        selection_id: str,
+        side: str,
+        price: float,
+        size: float
+    ) -> Dict[str, Any]:
+        """Place a bet on Betfair."""
+        if not self.is_authenticated:
+            return {"error": "Not authenticated"}
+            
+        try:
+            # Create limit order
+            limit_order = {
+                "size": size,
+                "price": price,
+                "persistenceType": "LAPSE"
+            }
+            
+            # Create place instruction
+            place_instruction = {
+                "orderType": "LIMIT",
+                "selectionId": selection_id,
+                "side": side.upper(),
+                "limitOrder": limit_order
+            }
+            
+            # Place the bet
+            result = self.client.betting.place_orders(
+                market_id=market_id,
+                instructions=[place_instruction]
+            )
+            
+            if result.status == "SUCCESS":
+                instruction_report = result.instruction_reports[0]
+                return {
+                    "success": True,
+                    "bet_id": instruction_report.bet_id,
+                    "placed_date": instruction_report.placed_date,
+                    "average_price_matched": instruction_report.average_price_matched,
+                    "size_matched": instruction_report.size_matched,
+                    "status": instruction_report.status
+                }
+            else:
+                return {
+                    "success": False,
+                    "error": result.error_code,
+                    "status": result.status
+                }
+                
+        except BetfairError as e:
+            self.logger.error(f"Error placing bet: {e}")
+            return {"error": str(e)}
+    
+    def cancel_bet(self, bet_id: str, size_reduction: Optional[float] = None) -> bool:
+        """Cancel or reduce a bet."""
+        if not self.is_authenticated:
+            return False
+            
+        try:
+            # Create cancel instruction
+            instruction = {"betId": bet_id}
+            if size_reduction:
+                instruction["sizeReduction"] = size_reduction
+                
+            result = self.client.betting.cancel_orders(
+                instructions=[instruction]
+            )
+            
+            return result.status == "SUCCESS"
+            
+        except BetfairError as e:
+            self.logger.error(f"Error cancelling bet: {e}")
+            return False
+    
+    def get_open_bets(self) -> List[Dict[str, Any]]:
+        """Get list of open bets."""
+        if not self.is_authenticated:
+            return []
+            
+        try:
+            # Get current orders
+            current_orders = self.client.betting.list_current_orders()
+            
+            # Handle dict format due to lightweight=True
+            orders = current_orders.get('currentOrders', []) if isinstance(current_orders, dict) else []
+            
+            open_bets = []
+            for order in orders:
+                price_size = order.get('priceSize', {})
+                open_bets.append({
+                    "bet_id": order.get('betId'),
+                    "market_id": order.get('marketId'),
+                    "selection_id": order.get('selectionId'),
+                    "price": price_size.get('price', 0),
+                    "size": price_size.get('size', 0),
+                    "side": order.get('side'),
+                    "status": order.get('status'),
+                    "matched_size": order.get('sizeMatched', 0),
+                    "remaining_size": order.get('sizeRemaining', 0),
+                    "placed_date": order.get('placedDate')
+                })
+                
+            return open_bets
+            
+        except BetfairError as e:
+            self.logger.error(f"Error getting open bets: {e}")
+            return []
+    
+    def keep_alive(self) -> bool:
+        """Keep the session alive."""
+        if not self.is_authenticated:
+            return False
+            
+        try:
+            # Send keep alive request
+            resp = self.client.keep_alive()
+            
+            if resp.status == "SUCCESS":
+                self.last_keep_alive = datetime.now()
+                self.logger.debug("Keep-alive successful")
+                return True
+            else:
+                self.logger.warning(f"Keep-alive failed: {resp.status}")
+                return False
+                
+        except BetfairError as e:
+            self.logger.error(f"Keep-alive error: {e}")
+            return False
+    
+    def disconnect(self) -> None:
+        """Disconnect from Betfair."""
+        try:
+            # Stop keep-alive thread
+            self._stop_keep_alive.set()
+            if self._keep_alive_thread:
+                self._keep_alive_thread.join(timeout=5)
+                
+            # Logout from Betfair
+            if self.is_authenticated:
+                self.client.logout()
+                
+        except Exception as e:
+            self.logger.error(f"Error during disconnect: {e}")
+        finally:
+            super().disconnect()
