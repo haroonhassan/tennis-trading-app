@@ -18,6 +18,8 @@ from .base import (
     Score, 
     MatchStats
 )
+from .models import StreamMessage, StreamConfig, StreamStatus
+from .betfair_stream import BetfairStreamClient
 
 
 class BetfairProvider(BaseDataProvider):
@@ -57,6 +59,10 @@ class BetfairProvider(BaseDataProvider):
         # Price subscription management
         self._price_subscriptions = {}
         self._price_callback = None
+        
+        # Streaming
+        self.stream_client = None
+        self._stream_callback = None
         
     def _validate_config(self):
         """Validate required configuration is present."""
@@ -475,6 +481,10 @@ class BetfairProvider(BaseDataProvider):
     def disconnect(self) -> None:
         """Disconnect from Betfair."""
         try:
+            # Disconnect stream if connected
+            if self.stream_client:
+                self.stream_client.disconnect()
+                
             # Stop keep-alive thread
             self._stop_keep_alive.set()
             if self._keep_alive_thread:
@@ -488,3 +498,104 @@ class BetfairProvider(BaseDataProvider):
             self.logger.error(f"Error during disconnect: {e}")
         finally:
             super().disconnect()
+    
+    # ============== Streaming Methods ==============
+    
+    def connect_stream(self, config: Optional[StreamConfig] = None) -> bool:
+        """
+        Connect to Betfair streaming service.
+        
+        Args:
+            config: Optional streaming configuration
+            
+        Returns:
+            bool: True if connection successful
+        """
+        if not self.is_authenticated:
+            self.logger.error("Must authenticate before connecting to stream")
+            return False
+            
+        try:
+            # Create stream client if not exists
+            if not self.stream_client:
+                self.stream_client = BetfairStreamClient(
+                    session_token=self.session_token,
+                    app_key=self.app_key,
+                    cert_file=self.cert_file,
+                    logger=self.logger
+                )
+            
+            # Connect to stream
+            return self.stream_client.connect(config)
+            
+        except Exception as e:
+            self.logger.error(f"Failed to connect stream: {e}")
+            return False
+    
+    def disconnect_stream(self) -> bool:
+        """Disconnect from streaming service."""
+        if self.stream_client:
+            return self.stream_client.disconnect()
+        return True
+    
+    def subscribe_market_stream(
+        self,
+        market_ids: List[str],
+        callback: Callable[[StreamMessage], None],
+        config: Optional[Dict] = None
+    ) -> bool:
+        """
+        Subscribe to streaming updates for markets.
+        
+        Args:
+            market_ids: List of market IDs to subscribe to
+            callback: Function to call with stream messages
+            config: Optional subscription configuration
+            
+        Returns:
+            bool: True if subscription successful
+        """
+        if not self.stream_client:
+            self.logger.error("Stream not connected")
+            return False
+            
+        self._stream_callback = callback
+        
+        # Extract config parameters
+        fields = config.get("fields") if config else None
+        conflate_ms = config.get("conflate_ms") if config else None
+        
+        return self.stream_client.subscribe_markets(
+            market_ids=market_ids,
+            callback=callback,
+            fields=fields,
+            conflate_ms=conflate_ms
+        )
+    
+    def unsubscribe_market_stream(self, market_ids: List[str]) -> bool:
+        """Unsubscribe from market streams."""
+        if self.stream_client:
+            return self.stream_client.unsubscribe_markets(market_ids)
+        return False
+    
+    def handle_stream_message(self, message: Any) -> Optional[StreamMessage]:
+        """
+        Handle a stream message (already handled by BetfairStreamClient).
+        
+        Args:
+            message: Raw message from stream
+            
+        Returns:
+            StreamMessage or None
+        """
+        # BetfairStreamClient already handles and normalizes messages
+        # This is here for API compliance
+        if isinstance(message, StreamMessage):
+            return message
+        return None
+    
+    def get_stream_status(self) -> StreamStatus:
+        """Get streaming connection status."""
+        if self.stream_client:
+            return self.stream_client.get_status()
+        return StreamStatus.DISCONNECTED

@@ -5,6 +5,7 @@ from typing import Dict, List, Optional, Any, Callable
 from datetime import datetime
 from dataclasses import dataclass
 import logging
+from .models import StreamMessage, StreamConfig, MarketPrices, StreamStatus
 
 
 @dataclass
@@ -219,3 +220,88 @@ class BaseDataProvider(ABC):
         self.is_authenticated = False
         self.session_token = None
         self.logger.info("Disconnected from provider")
+    
+    # ============== Streaming Methods ==============
+    
+    @abstractmethod
+    def connect_stream(self, config: Optional[StreamConfig] = None) -> bool:
+        """
+        Connect to the provider's streaming service.
+        
+        Args:
+            config: Optional streaming configuration
+            
+        Returns:
+            bool: True if connection successful
+        """
+        pass
+    
+    @abstractmethod
+    def disconnect_stream(self) -> bool:
+        """
+        Disconnect from the streaming service.
+        
+        Returns:
+            bool: True if disconnection successful
+        """
+        pass
+    
+    @abstractmethod
+    def subscribe_market_stream(
+        self,
+        market_ids: List[str],
+        callback: Callable[[StreamMessage], None],
+        config: Optional[Dict] = None
+    ) -> bool:
+        """
+        Subscribe to streaming updates for specific markets.
+        
+        Args:
+            market_ids: List of market IDs to subscribe to
+            callback: Function to call with stream messages
+            config: Optional subscription configuration
+            
+        Returns:
+            bool: True if subscription successful
+        """
+        pass
+    
+    @abstractmethod
+    def unsubscribe_market_stream(self, market_ids: List[str]) -> bool:
+        """
+        Unsubscribe from market streams.
+        
+        Args:
+            market_ids: List of market IDs to unsubscribe from
+            
+        Returns:
+            bool: True if unsubscription successful
+        """
+        pass
+    
+    @abstractmethod
+    def handle_stream_message(self, message: Any) -> Optional[StreamMessage]:
+        """
+        Parse and handle a raw stream message.
+        
+        Args:
+            message: Raw message from the stream
+            
+        Returns:
+            Parsed StreamMessage or None if not relevant
+        """
+        pass
+    
+    @abstractmethod
+    def get_stream_status(self) -> StreamStatus:
+        """
+        Get current streaming connection status.
+        
+        Returns:
+            StreamStatus enum value
+        """
+        pass
+    
+    def is_stream_connected(self) -> bool:
+        """Check if stream is connected."""
+        return self.get_stream_status() == StreamStatus.CONNECTED

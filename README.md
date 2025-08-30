@@ -43,7 +43,13 @@ The application follows a microservices architecture with clear separation of co
    python scripts/test_providers.py
    ```
 
-5. **Run the application**
+5. **Run live price streaming console**
+   ```bash
+   cd backend && source venv/bin/activate
+   python ../scripts/test_streaming_simulated.py
+   ```
+
+6. **Run the application**
    ```bash
    make dev  # Runs both backend and frontend
    
@@ -64,6 +70,8 @@ tennis-trading-app/
 │   │   ├── providers/      # Data provider implementations
 │   │   │   ├── base.py     # Abstract base provider
 │   │   │   ├── betfair.py  # Betfair implementation
+│   │   │   ├── betfair_stream.py  # Betfair streaming client
+│   │   │   ├── models.py   # Universal data models
 │   │   │   └── factory.py  # Provider factory
 │   │   ├── services/       # Business logic
 │   │   └── utils/          # Utility functions
@@ -80,7 +88,9 @@ tennis-trading-app/
 │   └── development.md     # Development guidelines
 ├── scripts/                # Utility scripts
 │   ├── test_betfair_connection.py  # Betfair connection test
-│   └── test_providers.py           # Provider testing script
+│   ├── test_providers.py           # Provider testing script
+│   ├── test_streaming.py            # Real streaming test (requires API access)
+│   └── test_streaming_simulated.py # Simulated streaming console
 ├── Makefile               # Common commands
 └── README.md              # This file
 ```
@@ -104,14 +114,35 @@ The application uses an abstract provider pattern to support multiple betting ex
   - Automatic session management
   - Lightweight mode for performance
 
+### Streaming Capabilities
+
+The system supports real-time price streaming with:
+
+- **Live Price Updates**: Console display with real-time market prices
+- **Price Movement Tracking**: Visual indicators (↑↓) for price changes
+- **Provider-Agnostic Models**: Universal data format across all providers
+- **Two Modes**:
+  - **Real Streaming**: Full Betfair Stream API implementation (requires API approval)
+  - **Simulated Streaming**: Polling-based fallback for demonstration
+
+#### Running the Live Console
+```bash
+cd backend && source venv/bin/activate
+python ../scripts/test_streaming_simulated.py
+
+# Or with specific market ID
+python ../scripts/test_streaming_simulated.py 1.247201095
+```
+
 ### Adding New Providers
 ```python
 from app.providers import BaseDataProvider, DataProviderFactory
 
 class NewProvider(BaseDataProvider):
-    # Implement required methods
-    pass
-
+    # Implement required methods including streaming
+    def connect_stream(self, config): ...
+    def subscribe_market_stream(self, market_ids, callback): ...
+    
 # Register with factory
 DataProviderFactory.register_provider("new_provider", NewProvider)
 ```
@@ -149,12 +180,18 @@ DataProviderFactory.register_provider("new_provider", NewProvider)
   - [x] Session management with auto keep-alive
   - [x] Connection testing and validation
 
+- [x] **Phase 2: Streaming & Real-time Data**
+  - [x] Provider-agnostic streaming methods in BaseDataProvider
+  - [x] Universal data models (StreamMessage, MarketPrices, etc.)
+  - [x] BetfairStreamClient implementation
+  - [x] Real-time price updates with console display
+  - [x] Price movement tracking and indicators
+  - [x] Auto-reconnection and heartbeat management
+  - [x] Polling fallback for demonstration
+  - [ ] WebSocket server for frontend (pending)
+  - [ ] Order stream subscription (pending)
+
 ### 🚧 In Progress
-- [ ] **Phase 2: Streaming & Real-time Data**
-  - [ ] Betfair streaming API integration
-  - [ ] WebSocket server for frontend
-  - [ ] Real-time price updates
-  - [ ] Order stream subscription
 
 - [ ] **Phase 3: Backend API Development**
   - [ ] FastAPI REST endpoints
