@@ -329,6 +329,35 @@ class BetfairProvider(BaseDataProvider):
         self.logger.warning("Stats data not available through Betfair API")
         return None
     
+    def get_market_book(self, market_id: str) -> Optional[Dict[str, Any]]:
+        """Get detailed market book with prices and volumes."""
+        if not self.is_authenticated:
+            return None
+        
+        try:
+            # Get market book with full price data
+            market_books = self.client.betting.list_market_book(
+                market_ids=[market_id],
+                price_projection={
+                    'priceData': ['EX_BEST_OFFERS', 'EX_TRADED'],
+                    'virtualise': True
+                }
+            )
+            
+            # Return first market book (we only requested one)
+            if market_books:
+                if isinstance(market_books, list):
+                    return market_books[0]
+                else:
+                    # Handle dict response
+                    return market_books
+            
+            return None
+            
+        except BetfairError as e:
+            self.logger.error(f"Error getting market book: {e}")
+            return None
+    
     def get_account_balance(self) -> Dict[str, float]:
         """Get account balance information."""
         if not self.is_authenticated:
@@ -352,60 +381,128 @@ class BetfairProvider(BaseDataProvider):
             self.logger.error(f"Error getting account balance: {e}")
             return {}
     
-    def place_bet(
+    def place_back_bet(
+        self,
+        market_id: str,
+        selection_id: str,
+        price: float,
+        size: float,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """Place a back bet on Betfair."""
+        return self._place_bet(market_id, selection_id, "BACK", price, size, **kwargs)
+    
+    def place_lay_bet(
+        self,
+        market_id: str,
+        selection_id: str,
+        price: float,
+        size: float,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """Place a lay bet on Betfair."""
+        return self._place_bet(market_id, selection_id, "LAY", price, size, **kwargs)
+    
+    def _place_bet(
         self,
         market_id: str,
         selection_id: str,
         side: str,
         price: float,
-        size: float
+        size: float,
+        persistence_type: str = "LAPSE",
+        order_type: str = "LIMIT",
+        time_in_force: Optional[str] = None,
+        min_fill_size: Optional[float] = None,
+        bet_target_type: Optional[str] = None,
+        bet_target_size: Optional[float] = None,
+        customer_ref: Optional[str] = None,
+        **kwargs
     ) -> Dict[str, Any]:
-        """Place a bet on Betfair."""
+        """Internal method to place a bet on Betfair."""
         if not self.is_authenticated:
-            return {"error": "Not authenticated"}
+            return {"success": False, "error": "Not authenticated"}
             
         try:
             # Create limit order
             limit_order = {
                 "size": size,
                 "price": price,
-                "persistenceType": "LAPSE"
+                "persistenceType": persistence_type
             }
+            
+            # Add optional parameters
+            if time_in_force:
+                limit_order["timeInForce"] = time_in_force
+            if min_fill_size:
+                limit_order["minFillSize"] = min_fill_size
+            if bet_target_type and bet_target_size:
+                limit_order["betTargetType"] = bet_target_type
+                limit_order["betTargetSize"] = bet_target_size
             
             # Create place instruction
             place_instruction = {
-                "orderType": "LIMIT",
+                "orderType": order_type,
                 "selectionId": selection_id,
-                "side": side.upper(),
+                "side": side,
                 "limitOrder": limit_order
             }
+            
+            if customer_ref:
+                place_instruction["customerOrderRef"] = customer_ref
             
             # Place the bet
             result = self.client.betting.place_orders(
                 market_id=market_id,
-                instructions=[place_instruction]
+                instructions=[place_instruction],
+                customer_ref=customer_ref
             )
             
-            if result.status == "SUCCESS":
-                instruction_report = result.instruction_reports[0]
-                return {
-                    "success": True,
-                    "bet_id": instruction_report.bet_id,
-                    "placed_date": instruction_report.placed_date,
-                    "average_price_matched": instruction_report.average_price_matched,
-                    "size_matched": instruction_report.size_matched,
-                    "status": instruction_report.status
-                }
+            # Handle dict format due to lightweight=True
+            if isinstance(result, dict):
+                status = result.get('status')
+                if status == "SUCCESS":
+                    instruction_reports = result.get('instructionReports', [])
+                    if instruction_reports:
+                        report = instruction_reports[0]
+                        return {
+                            "success": True,
+                            "bet_id": report.get('betId'),
+                            "placed_date": report.get('placedDate'),
+                            "average_price_matched": report.get('averagePriceMatched', 0),
+                            "size_matched": report.get('sizeMatched', 0),
+                            "status": report.get('status'),
+                            "order_status": report.get('orderStatus'),
+                            "instruction": report
+                        }
+                else:
+                    return {
+                        "success": False,
+                        "error": result.get('errorCode', 'Unknown error'),
+                        "status": status
+                    }
             else:
-                return {
-                    "success": False,
-                    "error": result.error_code,
-                    "status": result.status
-                }
+                # Handle object format
+                if result.status == "SUCCESS":
+                    instruction_report = result.instruction_reports[0]
+                    return {
+                        "success": True,
+                        "bet_id": instruction_report.bet_id,
+                        "placed_date": instruction_report.placed_date,
+                        "average_price_matched": instruction_report.average_price_matched,
+                        "size_matched": instruction_report.size_matched,
+                        "status": instruction_report.status
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "error": result.error_code,
+                        "status": result.status
+                    }
                 
         except BetfairError as e:
             self.logger.error(f"Error placing bet: {e}")
-            return {"error": str(e)}
+            return {"success": False, "error": str(e)}
     
     def cancel_bet(self, bet_id: str, size_reduction: Optional[float] = None) -> bool:
         """Cancel or reduce a bet."""
@@ -413,20 +510,185 @@ class BetfairProvider(BaseDataProvider):
             return False
             
         try:
+            # First, get the market ID for this bet
+            current_orders = self.client.betting.list_current_orders(
+                bet_ids=[bet_id]
+            )
+            
+            # Extract market_id from the order
+            market_id = None
+            if isinstance(current_orders, dict):
+                orders = current_orders.get('currentOrders', [])
+                if orders:
+                    market_id = orders[0].get('marketId')
+            
             # Create cancel instruction
             instruction = {"betId": bet_id}
             if size_reduction:
                 instruction["sizeReduction"] = size_reduction
-                
-            result = self.client.betting.cancel_orders(
-                instructions=[instruction]
-            )
             
-            return result.status == "SUCCESS"
+            # Cancel the bet - market_id might be required
+            kwargs = {"instructions": [instruction]}
+            if market_id:
+                kwargs["market_id"] = market_id
+                
+            result = self.client.betting.cancel_orders(**kwargs)
+            
+            # Handle dict response
+            if isinstance(result, dict):
+                status = result.get('status')
+                if status == "SUCCESS":
+                    # Check instruction reports
+                    reports = result.get('instructionReports', [])
+                    if reports and reports[0].get('status') == 'SUCCESS':
+                        return True
+                    else:
+                        self.logger.error(f"Cancel failed: {reports[0] if reports else 'No report'}")
+                        return False
+                else:
+                    self.logger.error(f"Cancel failed with status: {status}")
+                    return False
+            else:
+                return result.status == "SUCCESS"
             
         except BetfairError as e:
             self.logger.error(f"Error cancelling bet: {e}")
             return False
+    
+    def update_bet(
+        self,
+        bet_id: str,
+        new_price: Optional[float] = None,
+        new_size: Optional[float] = None
+    ) -> Dict[str, Any]:
+        """Update bet price and/or size by replacing the bet."""
+        if not self.is_authenticated:
+            return {"success": False, "error": "Not authenticated"}
+        
+        try:
+            # Betfair doesn't support direct bet updates, so we need to:
+            # 1. Get current bet details
+            # 2. Cancel the old bet
+            # 3. Place a new bet with updated parameters
+            
+            # Get current order details
+            current_orders = self.client.betting.list_current_orders(
+                bet_ids=[bet_id]
+            )
+            
+            if isinstance(current_orders, dict):
+                orders = current_orders.get('currentOrders', [])
+            else:
+                orders = []
+            
+            if not orders:
+                return {"success": False, "error": "Bet not found"}
+            
+            order = orders[0]
+            
+            # Cancel existing bet
+            if not self.cancel_bet(bet_id):
+                return {"success": False, "error": "Failed to cancel existing bet"}
+            
+            # Place new bet with updated parameters
+            market_id = order.get('marketId')
+            selection_id = order.get('selectionId')
+            side = order.get('side')
+            
+            # Use new values or existing ones
+            price = new_price if new_price else order.get('priceSize', {}).get('price')
+            size = new_size if new_size else order.get('sizeRemaining')
+            
+            # Place the replacement bet
+            if side == "BACK":
+                return self.place_back_bet(market_id, selection_id, price, size)
+            else:
+                return self.place_lay_bet(market_id, selection_id, price, size)
+                
+        except BetfairError as e:
+            self.logger.error(f"Error updating bet: {e}")
+            return {"success": False, "error": str(e)}
+    
+    def get_open_orders(self, market_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Get list of open/unmatched orders."""
+        if not self.is_authenticated:
+            return []
+        
+        try:
+            # Build filter
+            kwargs = {}
+            if market_id:
+                kwargs['market_ids'] = [market_id]
+            
+            # Get current orders
+            current_orders = self.client.betting.list_current_orders(**kwargs)
+            
+            # Handle dict format due to lightweight=True
+            orders = current_orders.get('currentOrders', []) if isinstance(current_orders, dict) else []
+            
+            open_orders = []
+            for order in orders:
+                price_size = order.get('priceSize', {})
+                open_orders.append({
+                    "bet_id": order.get('betId'),
+                    "market_id": order.get('marketId'),
+                    "selection_id": order.get('selectionId'),
+                    "price": price_size.get('price', 0),
+                    "size": price_size.get('size', 0),
+                    "side": order.get('side'),
+                    "status": order.get('status'),
+                    "matched_size": order.get('sizeMatched', 0),
+                    "remaining_size": order.get('sizeRemaining', 0),
+                    "placed_date": order.get('placedDate'),
+                    "average_price_matched": order.get('averagePriceMatched', 0)
+                })
+            
+            return open_orders
+            
+        except BetfairError as e:
+            self.logger.error(f"Error getting open orders: {e}")
+            return []
+    
+    def get_matched_bets(self, market_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Get list of matched bets."""
+        if not self.is_authenticated:
+            return []
+        
+        try:
+            # Build filter
+            kwargs = {'order_projection': 'EXECUTABLE'}
+            if market_id:
+                kwargs['market_ids'] = [market_id]
+            
+            # Get cleared orders (matched bets)
+            cleared_orders = self.client.betting.list_cleared_orders(
+                bet_status='SETTLED',
+                **kwargs
+            )
+            
+            # Handle dict format
+            orders = cleared_orders.get('clearedOrders', []) if isinstance(cleared_orders, dict) else []
+            
+            matched_bets = []
+            for order in orders:
+                matched_bets.append({
+                    "bet_id": order.get('betId'),
+                    "market_id": order.get('marketId'),
+                    "selection_id": order.get('selectionId'),
+                    "price": order.get('priceMatched', 0),
+                    "size": order.get('sizeSettled', 0),
+                    "side": order.get('side'),
+                    "placed_date": order.get('placedDate'),
+                    "settled_date": order.get('settledDate'),
+                    "profit": order.get('profit', 0),
+                    "commission": order.get('commission', 0)
+                })
+            
+            return matched_bets
+            
+        except BetfairError as e:
+            self.logger.error(f"Error getting matched bets: {e}")
+            return []
     
     def get_open_bets(self) -> List[Dict[str, Any]]:
         """Get list of open bets."""
@@ -471,12 +733,18 @@ class BetfairProvider(BaseDataProvider):
             # Send keep alive request
             resp = self.client.keep_alive()
             
-            if resp.status == "SUCCESS":
+            # Handle dict format due to lightweight=True
+            if isinstance(resp, dict):
+                status = resp.get('status')
+            else:
+                status = resp.status
+            
+            if status == "SUCCESS":
                 self.last_keep_alive = datetime.now()
                 self.logger.debug("Keep-alive successful")
                 return True
             else:
-                self.logger.warning(f"Keep-alive failed: {resp.status}")
+                self.logger.warning(f"Keep-alive failed: {status}")
                 return False
                 
         except BetfairError as e:

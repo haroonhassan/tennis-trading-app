@@ -8,9 +8,9 @@ from pathlib import Path
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "backend"))
 
-# Load environment variables
+# Load environment variables from main folder
 from dotenv import load_dotenv
-load_dotenv(Path(__file__).parent.parent / "backend" / ".env")
+load_dotenv(Path(__file__).parent.parent / ".env")
 
 if __name__ == "__main__":
     import uvicorn

@@ -1,7 +1,7 @@
 # Core
 python-dotenv==1.0.0
-pydantic==2.0.0
-pydantic-settings==2.0.0
+pydantic>=2.5.0
+pydantic-settings>=2.0.0
 
 # Betfair
 betfairlightweight==2.20.1
@@ -27,3 +27,7 @@ pylint==3.0.0
 
 # WebSocket Client (for testing)
 websocket-client==1.6.4
+
+# Trading CLI
+click==8.1.7
+rich==13.7.0

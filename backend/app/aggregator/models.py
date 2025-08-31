@@ -236,10 +236,12 @@ class UnifiedMatchState:
     
     # Match identification
     match_id: str  # Internal unified ID
-    provider_match_ids: Dict[str, str] = field(default_factory=dict)
     
     # Match information (best available data)
     match: TennisMatch
+    
+    # Optional fields
+    provider_match_ids: Dict[str, str] = field(default_factory=dict)
     score: Optional[TennisScore] = None
     statistics: Optional[MatchStatistics] = None
     

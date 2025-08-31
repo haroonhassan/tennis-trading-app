@@ -170,6 +170,137 @@ class BaseDataProvider(ABC):
         """
         pass
     
+    # ============== Trading Methods ==============
+    
+    @abstractmethod
+    def place_back_bet(
+        self,
+        market_id: str,
+        selection_id: str,
+        price: float,
+        size: float,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """
+        Place a back bet.
+        
+        Args:
+            market_id: Market identifier
+            selection_id: Selection/runner identifier
+            price: Requested odds
+            size: Stake amount
+            **kwargs: Provider-specific parameters
+            
+        Returns:
+            Dict with bet details and status
+        """
+        pass
+    
+    @abstractmethod
+    def place_lay_bet(
+        self,
+        market_id: str,
+        selection_id: str,
+        price: float,
+        size: float,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """
+        Place a lay bet.
+        
+        Args:
+            market_id: Market identifier
+            selection_id: Selection/runner identifier
+            price: Requested odds
+            size: Liability amount
+            **kwargs: Provider-specific parameters
+            
+        Returns:
+            Dict with bet details and status
+        """
+        pass
+    
+    @abstractmethod
+    def cancel_bet(self, bet_id: str, size_reduction: Optional[float] = None) -> bool:
+        """
+        Cancel or reduce a bet.
+        
+        Args:
+            bet_id: Bet identifier
+            size_reduction: Optional partial cancellation amount
+            
+        Returns:
+            True if successful
+        """
+        pass
+    
+    @abstractmethod
+    def update_bet(
+        self,
+        bet_id: str,
+        new_price: Optional[float] = None,
+        new_size: Optional[float] = None
+    ) -> Dict[str, Any]:
+        """
+        Update bet price and/or size.
+        
+        Args:
+            bet_id: Bet identifier
+            new_price: New odds (optional)
+            new_size: New stake (optional)
+            
+        Returns:
+            Dict with updated bet details
+        """
+        pass
+    
+    @abstractmethod
+    def get_open_orders(self, market_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        """
+        Get list of open/unmatched orders.
+        
+        Args:
+            market_id: Optional market filter
+            
+        Returns:
+            List of open order details
+        """
+        pass
+    
+    @abstractmethod
+    def get_matched_bets(self, market_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        """
+        Get list of matched bets.
+        
+        Args:
+            market_id: Optional market filter
+            
+        Returns:
+            List of matched bet details
+        """
+        pass
+    
+    def get_account_balance(self) -> Optional[Dict[str, float]]:
+        """
+        Get account balance information.
+        
+        Returns:
+            Dict with balance details or None if not supported
+        """
+        return None
+    
+    def get_market_book(self, market_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Get detailed market book with prices and volumes.
+        
+        Args:
+            market_id: Market identifier
+            
+        Returns:
+            Market book data or None
+        """
+        return None
+    
     # Legacy methods for backward compatibility
     def get_match_scores(self, match_id: str) -> Optional[Score]:
         """Legacy method - use get_match_score instead."""
@@ -206,30 +337,6 @@ class BaseDataProvider(ABC):
         
         Returns:
             Dictionary with balance information
-        """
-        pass
-    
-    @abstractmethod
-    def place_bet(
-        self,
-        market_id: str,
-        selection_id: str,
-        side: str,  # "back" or "lay"
-        price: float,
-        size: float
-    ) -> Dict[str, Any]:
-        """
-        Place a bet.
-        
-        Args:
-            market_id: Market identifier
-            selection_id: Selection identifier
-            side: "back" or "lay"
-            price: Requested price
-            size: Stake amount
-            
-        Returns:
-            Dictionary with bet placement result
         """
         pass
     

@@ -38,46 +38,32 @@ The application follows a microservices architecture with clear separation of co
    make install  # Installs both backend and frontend dependencies
    ```
 
-4. **Test Betfair connection**
+4. **Run the FastAPI server**
    ```bash
-   python scripts/test_providers.py
-   ```
-
-5. **Run live price streaming console**
-   ```bash
-   cd backend && source venv/bin/activate
-   python ../scripts/test_streaming_simulated.py
-   ```
-
-6. **Run tennis scores service test**
-   ```bash
-   cd backend && source venv/bin/activate
-   python ../scripts/test_tennis_scores.py
-   ```
-
-7. **Run the FastAPI server**
-   ```bash
-   cd backend && source venv/bin/activate
-   python ../scripts/run_server.py
+   python scripts/run_server.py
    # Server will run on http://localhost:8000
    # API docs available at http://localhost:8000/docs
-   # WebSocket endpoint at ws://localhost:8000/ws
    ```
 
-8. **Test WebSocket connection**
+5. **View live prices in terminal**
    ```bash
-   # In another terminal
-   cd backend && source venv/bin/activate
-   python ../scripts/test_websocket.py
-   ```
-
-9. **Run the application**
-   ```bash
-   make dev  # Runs both backend and frontend
+   # One-time snapshot
+   python scripts/show_prices.py
    
-   # Or separately:
-   # Terminal 1: make dev-backend
-   # Terminal 2: make dev-frontend
+   # Auto-refreshing console
+   python scripts/basic_console.py
+   
+   # Rich terminal UI
+   python scripts/live_console.py
+   ```
+
+6. **Test trade execution (Practice Mode)**
+   ```bash
+   python scripts/trade_cli.py
+   # Interactive CLI for placing/cancelling bets
+   
+   # ⚠️ REAL MONEY MODE (use with extreme caution!)
+   # python scripts/trade_cli.py --real
    ```
 
 ## Project Structure
@@ -86,20 +72,21 @@ The application follows a microservices architecture with clear separation of co
 tennis-trading-app/
 ├── backend/                 # Python backend application
 │   ├── app/                # Application source code
-│   │   ├── api/            # API endpoints
-│   │   ├── core/           # Core functionality
-│   │   ├── models/         # Data models
+│   │   ├── aggregator/     # Multi-provider data aggregation
+│   │   ├── config.py       # Application configuration
 │   │   ├── providers/      # Data provider implementations
-│   │   │   ├── base.py     # Abstract base provider
-│   │   │   ├── betfair.py  # Betfair implementation
-│   │   │   ├── betfair_stream.py  # Betfair streaming client
-│   │   │   ├── models.py   # Universal data models
-│   │   │   └── factory.py  # Provider factory
-│   │   ├── services/       # Business logic
-│   │   └── utils/          # Utility functions
+│   │   │   ├── base.py     # Abstract base provider with trading methods
+│   │   │   ├── betfair.py  # Betfair implementation (fully functional)
+│   │   │   ├── normalizer.py # Data normalization
+│   │   │   └── tennis_models.py # Tennis-specific models
+│   │   ├── server/         # FastAPI server and WebSocket
+│   │   └── trading/        # Trade execution engine
+│   │       ├── models.py   # Trading data models
+│   │       ├── executor.py # Trade executor with risk management
+│   │       ├── strategies.py # Execution strategies (Aggressive, Passive, TWAP, etc.)
+│   │       └── audit.py    # Trade event logging and compliance
 │   ├── tests/              # Test suite
-│   ├── requirements.txt    # Python dependencies
-│   └── .env.example        # Environment variables template
+│   └── requirements.txt    # Python dependencies
 ├── frontend/               # React frontend application
 │   ├── src/               # Source code
 │   ├── public/            # Static assets
@@ -109,10 +96,12 @@ tennis-trading-app/
 │   ├── betfair-setup.md   # Betfair API setup guide
 │   └── development.md     # Development guidelines
 ├── scripts/                # Utility scripts
-│   ├── test_betfair_connection.py  # Betfair connection test
-│   ├── test_providers.py           # Provider testing script
-│   ├── test_streaming.py            # Real streaming test (requires API access)
-│   └── test_streaming_simulated.py # Simulated streaming console
+│   ├── run_server.py      # Start the FastAPI server
+│   ├── show_prices.py     # Display current prices snapshot
+│   ├── basic_console.py   # Auto-refreshing price console
+│   ├── live_console.py    # Rich terminal UI with WebSocket
+│   ├── trade_cli.py       # Interactive trading CLI
+│   └── test_*.py          # Various test scripts
 ├── Makefile               # Common commands
 └── README.md              # This file
 ```
@@ -123,11 +112,11 @@ The application uses an abstract provider pattern to support multiple betting ex
 
 ### BaseDataProvider Interface
 - `authenticate()` - Handle provider authentication
-- `get_live_matches()` - Fetch current live matches
-- `subscribe_to_prices()` - Real-time price subscriptions
-- `get_match_scores()` - Current match scores
-- `get_match_stats()` - Match statistics
-- `place_bet()` / `cancel_bet()` - Trading operations
+- `get_tennis_matches()` - Fetch tennis matches with prices
+- `place_back_bet()` / `place_lay_bet()` - Place trading orders
+- `cancel_bet()` / `update_bet()` - Manage existing orders
+- `get_open_orders()` / `get_matched_bets()` - Track positions
+- `get_market_book()` - Detailed market prices and volumes
 - `get_account_balance()` - Account information
 
 ### Current Implementations
@@ -156,14 +145,57 @@ python ../scripts/test_streaming_simulated.py
 python ../scripts/test_streaming_simulated.py 1.247201095
 ```
 
+### Trade Execution Engine
+
+The system includes a sophisticated trade execution engine with multiple features:
+
+#### Execution Strategies
+- **Aggressive**: Crosses the spread for immediate execution
+- **Passive**: Joins the queue at the best available price
+- **Iceberg**: Breaks large orders into smaller chunks to minimize market impact
+- **TWAP**: Executes over a time period to achieve time-weighted average price
+- **Smart**: Intelligently selects strategy based on market conditions
+
+#### Risk Management
+- Maximum order size limits
+- Market exposure tracking
+- Rate limiting per market
+- Duplicate order detection
+- Market suspension checks
+
+#### Trade Event System
+- Comprehensive audit logging to JSON files
+- Real-time event bus for notifications
+- Compliance reporting capabilities
+- Suspicious activity detection
+
+#### Usage Example
+```python
+from app.trading import TradeExecutor, TradeInstruction, OrderSide, ExecutionStrategy
+
+# Create trade instruction
+instruction = TradeInstruction(
+    market_id="1.123456",
+    selection_id="789",
+    side=OrderSide.BACK,
+    size=Decimal("10"),
+    price=Decimal("2.5"),
+    strategy=ExecutionStrategy.SMART
+)
+
+# Execute trade
+report = await executor.execute_order(instruction)
+```
+
 ### Adding New Providers
 ```python
 from app.providers import BaseDataProvider, DataProviderFactory
 
 class NewProvider(BaseDataProvider):
-    # Implement required methods including streaming
-    def connect_stream(self, config): ...
-    def subscribe_market_stream(self, market_ids, callback): ...
+    # Implement required methods including trading
+    def place_back_bet(self, ...): ...
+    def place_lay_bet(self, ...): ...
+    def cancel_bet(self, ...): ...
     
 # Register with factory
 DataProviderFactory.register_provider("new_provider", NewProvider)
@@ -231,30 +263,57 @@ DataProviderFactory.register_provider("new_provider", NewProvider)
   - [x] API documentation (auto-generated at /docs)
   - [x] WebSocket test client
 
+- [x] **Phase 5: Trade Execution Engine**
+  - [x] Trading execution layer with risk management
+    - [x] TradeExecutor service with validation and safeguards
+    - [x] Rate limiting and duplicate detection
+    - [x] Market suspension checks
+  - [x] Multiple execution strategies
+    - [x] Aggressive (cross the spread)
+    - [x] Passive (join the queue)
+    - [x] Iceberg (hide large orders)
+    - [x] TWAP (time-weighted average)
+    - [x] Smart routing (intelligent selection)
+  - [x] Trade event system and audit logging
+    - [x] Comprehensive audit trail (JSON logs)
+    - [x] Event bus for real-time notifications
+    - [x] Compliance reporting capabilities
+  - [x] Interactive CLI for testing (`scripts/trade_cli.py`)
+  - [x] Real money order placement and cancellation (tested live)
+
 ### 🚧 In Progress
 
-- [ ] **Phase 5: Backend API Development**
-  - [ ] Trading execution layer
-  - [ ] Advanced order management
-  - [ ] Position tracking
+- [ ] **Phase 6: Advanced Order Management**
+  - [ ] Order book visualization and depth analysis
+  - [ ] Complex order types (stop-loss, trailing stops, conditional orders)
+  - [ ] Order modification and partial fills handling
+  - [ ] Queue position estimation
+  
+- [ ] **Phase 7: Position Tracking & P&L**
+  - [ ] Real-time position monitoring across markets
+  - [ ] P&L calculation (realized and unrealized)
+  - [ ] Exposure management and hedging tools
+  - [ ] Position history and performance analytics
+  - [ ] Multi-market portfolio view
 
 ### 📋 Planned
-- [ ] **Phase 6: React Frontend**
+
+- [ ] **Phase 8: React Frontend**
   - [ ] Component architecture
   - [ ] Real-time data display
   - [ ] Trading interface
   - [ ] Performance dashboards
 
-- [ ] **Phase 7: Additional Providers**
+- [ ] **Phase 9: Additional Providers**
   - [ ] Pinnacle Sports integration
   - [ ] Smarkets provider
   - [ ] Betdaq support
   - [ ] Unified data model
 
-- [ ] **Phase 8: Advanced Features**
+- [ ] **Phase 10: Advanced Features**
   - [ ] Automated trading strategies
   - [ ] Backtesting framework
-  - [ ] Risk management tools
+  - [ ] Advanced risk management
   - [ ] ML-based predictions
 
 ## Contributing
