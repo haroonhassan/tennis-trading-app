@@ -30,5 +30,6 @@ class Settings(BaseSettings):
     update_interval: int = 30
     
     class Config:
-        env_file = ".env"
+        env_file = "../.env"  # Use .env from main folder
         env_file_encoding = "utf-8"
+        extra = "ignore"  # Ignore extra fields in .env

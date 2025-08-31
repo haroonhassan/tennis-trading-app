@@ -3,7 +3,7 @@
 import asyncio
 import logging
 import time
-from typing import Dict, List, Optional, Any, Callable, Set
+from typing import Dict, List, Optional, Any, Callable, Set, Tuple
 from datetime import datetime, timedelta
 from collections import defaultdict
 
@@ -141,6 +141,23 @@ class AggregatorService:
             # Update match info if this is primary provider or better quality
             if self._should_update_match_info(unified_match, provider, match):
                 unified_match.match = match
+            
+            # Update prices if available in match odds
+            if match.odds:
+                provider_price = ProviderPrice(
+                    provider=provider,
+                    player1_back=match.odds.get("player1_back", 0),
+                    player1_lay=match.odds.get("player1_lay", 0),
+                    player2_back=match.odds.get("player2_back", 0),
+                    player2_lay=match.odds.get("player2_lay", 0),
+                    player1_back_volume=match.odds.get("player1_back_size"),
+                    player1_lay_volume=match.odds.get("player1_lay_size"),
+                    player2_back_volume=match.odds.get("player2_back_size"),
+                    player2_lay_volume=match.odds.get("player2_lay_size"),
+                    market_id=match.market_id,
+                    is_suspended=False
+                )
+                unified_match.update_prices(provider, provider_price)
             
             # Update data quality
             await self._update_data_quality(unified_match, provider)

@@ -644,14 +644,47 @@ class BetfairProvider(BaseDataProvider):
                 max_results=100
             )
             
-            # Normalize to TennisMatch objects
+            # Get market IDs for price fetching
+            market_ids = [market.get('marketId') for market in markets if market.get('marketId')]
+            
+            # Fetch prices for all markets in batches (max 5 per request to avoid TOO_MUCH_DATA error)
+            market_prices = {}
+            batch_size = 5
+            for i in range(0, len(market_ids), batch_size):
+                batch_ids = market_ids[i:i+batch_size]
+                try:
+                    # Get market book with price data
+                    market_books = self.client.betting.list_market_book(
+                        market_ids=batch_ids,
+                        price_projection={
+                            'priceData': ['EX_BEST_OFFERS', 'EX_TRADED'],
+                            'virtualise': True
+                        }
+                    )
+                    
+                    # Store prices by market ID
+                    for book in market_books:
+                        market_id = book.get('marketId')
+                        if market_id:
+                            market_prices[market_id] = book
+                            
+                except Exception as e:
+                    self.logger.warning(f"Failed to fetch prices for batch {i//batch_size}: {e}")
+            
+            # Normalize to TennisMatch objects with price data
             tennis_matches = []
             for market in markets:
+                market_id = market.get('marketId')
+                
+                # Add price data to market if available
+                if market_id and market_id in market_prices:
+                    market['priceData'] = market_prices[market_id]
+                
                 match = self.normalizer.normalize_match("betfair", market)
                 if match:
                     tennis_matches.append(match)
             
-            self.logger.info(f"Found {len(tennis_matches)} tennis matches")
+            self.logger.info(f"Found {len(tennis_matches)} tennis matches, {len(market_prices)} with prices")
             return tennis_matches
             
         except BetfairError as e:

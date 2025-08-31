@@ -383,7 +383,12 @@ class MatchMatcher:
         
         # Add timestamp if available
         if match.scheduled_start:
-            date_str = match.scheduled_start.strftime("%Y%m%d")
+            if isinstance(match.scheduled_start, str):
+                # Parse string date if needed
+                from datetime import datetime
+                date_str = datetime.fromisoformat(match.scheduled_start.replace('Z', '+00:00')).strftime("%Y%m%d")
+            else:
+                date_str = match.scheduled_start.strftime("%Y%m%d")
         else:
             date_str = datetime.now().strftime("%Y%m%d")
         

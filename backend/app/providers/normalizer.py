@@ -106,6 +106,34 @@ class MatchNormalizer:
         if score_data:
             match.score = self._parse_betfair_score(score_data, player1, player2)
         
+        # Extract price data if available
+        price_data = data.get("priceData")
+        if price_data and price_data.get("runners"):
+            odds = {}
+            for runner in price_data.get("runners", []):
+                runner_name = runner.get("selectionId")
+                # Map selection IDs to player positions
+                # In Betfair, runners[0] is typically player1, runners[1] is player2
+                runner_idx = price_data.get("runners", []).index(runner)
+                player_key = f"player{runner_idx + 1}"
+                
+                # Get best back and lay prices
+                ex = runner.get("ex", {})
+                available_to_back = ex.get("availableToBack", [])
+                available_to_lay = ex.get("availableToLay", [])
+                
+                if available_to_back:
+                    odds[f"{player_key}_back"] = available_to_back[0].get("price")
+                    odds[f"{player_key}_back_size"] = available_to_back[0].get("size")
+                
+                if available_to_lay:
+                    odds[f"{player_key}_lay"] = available_to_lay[0].get("price")
+                    odds[f"{player_key}_lay_size"] = available_to_lay[0].get("size")
+            
+            # Store odds in match object
+            match.odds = odds
+            match.metadata["prices"] = odds  # Also store in metadata for backward compatibility
+        
         return match
     
     def _normalize_pinnacle_match(self, data: Dict[str, Any]) -> TennisMatch:
