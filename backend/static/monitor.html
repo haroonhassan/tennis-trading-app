@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tennis Trading Monitor</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: #0f1419;
+            color: #e1e8ed;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            margin-bottom: 20px;
+            color: #1da1f2;
+        }
+        
+        .dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 20px;
+        }
+        
+        .card {
+            background: #192734;
+            border-radius: 8px;
+            padding: 20px;
+            border: 1px solid #253341;
+        }
+        
+        .card h2 {
+            margin-bottom: 15px;
+            color: #8899a6;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .status-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 5px;
+        }
+        
+        .status-indicator.connected {
+            background: #17bf63;
+        }
+        
+        .status-indicator.disconnected {
+            background: #e0245e;
+        }
+        
+        .metric {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #253341;
+        }
+        
+        .metric:last-child {
+            border-bottom: none;
+        }
+        
+        .metric-label {
+            color: #8899a6;
+        }
+        
+        .metric-value {
+            font-weight: bold;
+        }
+        
+        .metric-value.positive {
+            color: #17bf63;
+        }
+        
+        .metric-value.negative {
+            color: #e0245e;
+        }
+        
+        .positions-table {
+            width: 100%;
+            margin-top: 10px;
+        }
+        
+        .positions-table th {
+            text-align: left;
+            color: #8899a6;
+            padding: 8px 4px;
+            border-bottom: 1px solid #253341;
+            font-size: 12px;
+        }
+        
+        .positions-table td {
+            padding: 8px 4px;
+            font-size: 14px;
+        }
+        
+        .btn {
+            background: #1da1f2;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        
+        .btn:hover {
+            background: #1a91da;
+        }
+        
+        .btn.danger {
+            background: #e0245e;
+        }
+        
+        .btn.danger:hover {
+            background: #c51e4e;
+        }
+        
+        .btn.success {
+            background: #17bf63;
+        }
+        
+        .btn.success:hover {
+            background: #15a653;
+        }
+        
+        .alert {
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+        
+        .alert.warning {
+            background: #ffad1f;
+            color: #192734;
+        }
+        
+        .alert.error {
+            background: #e0245e;
+            color: white;
+        }
+        
+        .trade-form {
+            display: grid;
+            gap: 10px;
+        }
+        
+        .form-group {
+            display: grid;
+            gap: 5px;
+        }
+        
+        .form-group label {
+            font-size: 12px;
+            color: #8899a6;
+        }
+        
+        .form-group input, .form-group select {
+            padding: 8px;
+            background: #253341;
+            border: 1px solid #38444d;
+            color: #e1e8ed;
+            border-radius: 4px;
+        }
+        
+        .logs {
+            max-height: 200px;
+            overflow-y: auto;
+            background: #0f1419;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        
+        .log-entry {
+            margin-bottom: 5px;
+            padding: 5px;
+            border-left: 3px solid #38444d;
+        }
+        
+        .log-entry.success {
+            border-left-color: #17bf63;
+        }
+        
+        .log-entry.error {
+            border-left-color: #e0245e;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎾 Tennis Trading Monitor</h1>
+        
+        <div class="dashboard">
+            <!-- Connection Status -->
+            <div class="card">
+                <h2>Connection Status</h2>
+                <div class="metric">
+                    <span class="metric-label">WebSocket</span>
+                    <span class="metric-value">
+                        <span id="ws-status" class="status-indicator disconnected"></span>
+                        <span id="ws-text">Disconnected</span>
+                    </span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">API Server</span>
+                    <span class="metric-value">
+                        <span id="api-status" class="status-indicator disconnected"></span>
+                        <span id="api-text">Checking...</span>
+                    </span>
+                </div>
+            </div>
+            
+            <!-- P&L Summary -->
+            <div class="card">
+                <h2>P&L Summary</h2>
+                <div class="metric">
+                    <span class="metric-label">Realized P&L</span>
+                    <span id="realized-pnl" class="metric-value">£0.00</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Unrealized P&L</span>
+                    <span id="unrealized-pnl" class="metric-value">£0.00</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Total P&L</span>
+                    <span id="total-pnl" class="metric-value">£0.00</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Win Rate</span>
+                    <span id="win-rate" class="metric-value">0%</span>
+                </div>
+            </div>
+            
+            <!-- Risk Status -->
+            <div class="card">
+                <h2>Risk Management</h2>
+                <div id="risk-alerts"></div>
+                <div class="metric">
+                    <span class="metric-label">Total Exposure</span>
+                    <span id="total-exposure" class="metric-value">£0.00</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Exposure Limit Used</span>
+                    <span id="exposure-used" class="metric-value">0%</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Daily Loss Limit Used</span>
+                    <span id="loss-limit-used" class="metric-value">0%</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Risk Score</span>
+                    <span id="risk-score" class="metric-value">0/100</span>
+                </div>
+            </div>
+            
+            <!-- Trade Statistics -->
+            <div class="card">
+                <h2>Trade Statistics</h2>
+                <div class="metric">
+                    <span class="metric-label">Total Trades</span>
+                    <span id="total-trades" class="metric-value">0</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Successful</span>
+                    <span id="successful-trades" class="metric-value positive">0</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Failed</span>
+                    <span id="failed-trades" class="metric-value negative">0</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Success Rate</span>
+                    <span id="success-rate" class="metric-value">0%</span>
+                </div>
+            </div>
+            
+            <!-- Quick Trade -->
+            <div class="card">
+                <h2>Quick Trade</h2>
+                <form class="trade-form" id="trade-form">
+                    <div class="form-group">
+                        <label>Market ID</label>
+                        <input type="text" id="market-id" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Selection ID</label>
+                        <input type="text" id="selection-id" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Side</label>
+                        <select id="side">
+                            <option value="BACK">BACK</option>
+                            <option value="LAY">LAY</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Size (£)</label>
+                        <input type="number" id="size" step="0.01" min="2" value="2" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Price</label>
+                        <input type="number" id="price" step="0.01" min="1.01" value="2.0" required>
+                    </div>
+                    <button type="submit" class="btn">Place Trade</button>
+                </form>
+            </div>
+            
+            <!-- Activity Log -->
+            <div class="card">
+                <h2>Activity Log</h2>
+                <div class="logs" id="activity-log"></div>
+            </div>
+        </div>
+        
+        <!-- Positions Table -->
+        <div class="card" style="margin-top: 20px;">
+            <h2>Open Positions</h2>
+            <table class="positions-table">
+                <thead>
+                    <tr>
+                        <th>Market</th>
+                        <th>Selection</th>
+                        <th>Side</th>
+                        <th>Size</th>
+                        <th>Entry</th>
+                        <th>Current P&L</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="positions-tbody">
+                    <tr>
+                        <td colspan="7" style="text-align: center; color: #8899a6;">No open positions</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <script>
+        // Configuration
+        const API_BASE = 'http://localhost:8000';
+        const WS_BASE = 'ws://localhost:8000';
+        
+        // WebSocket connection
+        let ws = null;
+        let reconnectInterval = null;
+        
+        // DOM elements
+        const elements = {
+            wsStatus: document.getElementById('ws-status'),
+            wsText: document.getElementById('ws-text'),
+            apiStatus: document.getElementById('api-status'),
+            apiText: document.getElementById('api-text'),
+            realizedPnl: document.getElementById('realized-pnl'),
+            unrealizedPnl: document.getElementById('unrealized-pnl'),
+            totalPnl: document.getElementById('total-pnl'),
+            winRate: document.getElementById('win-rate'),
+            totalExposure: document.getElementById('total-exposure'),
+            exposureUsed: document.getElementById('exposure-used'),
+            lossLimitUsed: document.getElementById('loss-limit-used'),
+            riskScore: document.getElementById('risk-score'),
+            riskAlerts: document.getElementById('risk-alerts'),
+            totalTrades: document.getElementById('total-trades'),
+            successfulTrades: document.getElementById('successful-trades'),
+            failedTrades: document.getElementById('failed-trades'),
+            successRate: document.getElementById('success-rate'),
+            positionsBody: document.getElementById('positions-tbody'),
+            activityLog: document.getElementById('activity-log'),
+            tradeForm: document.getElementById('trade-form')
+        };
+        
+        // Connect to WebSocket
+        function connectWebSocket() {
+            ws = new WebSocket(`${WS_BASE}/api/ws/monitor`);
+            
+            ws.onopen = () => {
+                console.log('WebSocket connected');
+                elements.wsStatus.classList.remove('disconnected');
+                elements.wsStatus.classList.add('connected');
+                elements.wsText.textContent = 'Connected';
+                
+                if (reconnectInterval) {
+                    clearInterval(reconnectInterval);
+                    reconnectInterval = null;
+                }
+                
+                addLog('WebSocket connected', 'success');
+            };
+            
+            ws.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    handleWebSocketMessage(data);
+                } catch (e) {
+                    console.error('Error parsing WebSocket message:', e);
+                }
+            };
+            
+            ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+                addLog('WebSocket error', 'error');
+            };
+            
+            ws.onclose = () => {
+                console.log('WebSocket disconnected');
+                elements.wsStatus.classList.remove('connected');
+                elements.wsStatus.classList.add('disconnected');
+                elements.wsText.textContent = 'Disconnected';
+                
+                // Reconnect after 5 seconds
+                if (!reconnectInterval) {
+                    reconnectInterval = setInterval(connectWebSocket, 5000);
+                }
+                
+                addLog('WebSocket disconnected', 'error');
+            };
+        }
+        
+        // Handle WebSocket messages
+        function handleWebSocketMessage(data) {
+            if (data.type === 'monitor_update') {
+                updateDashboard(data);
+            }
+        }
+        
+        // Update dashboard with data
+        function updateDashboard(data) {
+            // Update P&L
+            if (data.pnl) {
+                elements.realizedPnl.textContent = `£${parseFloat(data.pnl.realized_pnl).toFixed(2)}`;
+                elements.unrealizedPnl.textContent = `£${parseFloat(data.pnl.unrealized_pnl).toFixed(2)}`;
+                elements.totalPnl.textContent = `£${parseFloat(data.pnl.total_pnl).toFixed(2)}`;
+                elements.winRate.textContent = `${data.pnl.win_rate}%`;
+                
+                // Color code P&L
+                updatePnlColor(elements.realizedPnl, parseFloat(data.pnl.realized_pnl));
+                updatePnlColor(elements.unrealizedPnl, parseFloat(data.pnl.unrealized_pnl));
+                updatePnlColor(elements.totalPnl, parseFloat(data.pnl.total_pnl));
+            }
+            
+            // Update Risk
+            if (data.risk) {
+                elements.totalExposure.textContent = `£${data.risk.total_exposure}`;
+                elements.exposureUsed.textContent = data.risk.exposure_used;
+                elements.lossLimitUsed.textContent = data.risk.loss_limit_used;
+                elements.riskScore.textContent = `${data.risk.risk_score}/100`;
+                
+                // Show alerts
+                if (data.risk.alerts && data.risk.alerts.length > 0) {
+                    elements.riskAlerts.innerHTML = data.risk.alerts.map(alert =>
+                        `<div class="alert warning">${alert}</div>`
+                    ).join('');
+                } else {
+                    elements.riskAlerts.innerHTML = '';
+                }
+                
+                // Show if trading is frozen
+                if (data.risk.trading_frozen) {
+                    elements.riskAlerts.innerHTML += 
+                        '<div class="alert error">⚠️ TRADING FROZEN</div>';
+                }
+            }
+            
+            // Update Stats
+            if (data.stats) {
+                elements.totalTrades.textContent = data.stats.total_trades;
+                elements.successfulTrades.textContent = data.stats.successful_trades;
+                elements.failedTrades.textContent = data.stats.failed_trades;
+                elements.successRate.textContent = data.stats.success_rate;
+            }
+            
+            // Update Positions
+            if (data.positions) {
+                updatePositionsTable(data.positions);
+            }
+        }
+        
+        // Update P&L color
+        function updatePnlColor(element, value) {
+            element.classList.remove('positive', 'negative');
+            if (value > 0) {
+                element.classList.add('positive');
+            } else if (value < 0) {
+                element.classList.add('negative');
+            }
+        }
+        
+        // Update positions table
+        function updatePositionsTable(positions) {
+            if (!positions || positions.length === 0) {
+                elements.positionsBody.innerHTML = 
+                    '<tr><td colspan="7" style="text-align: center; color: #8899a6;">No open positions</td></tr>';
+                return;
+            }
+            
+            elements.positionsBody.innerHTML = positions.map(pos => `
+                <tr>
+                    <td>${pos.market_id.substring(0, 10)}...</td>
+                    <td>${pos.selection_id}</td>
+                    <td>${pos.side}</td>
+                    <td>£${pos.current_size}</td>
+                    <td>${pos.entry_price}</td>
+                    <td class="${parseFloat(pos.total_pnl) >= 0 ? 'positive' : 'negative'}">
+                        £${parseFloat(pos.total_pnl).toFixed(2)}
+                    </td>
+                    <td>
+                        <button class="btn success" onclick="hedgePosition('${pos.position_id}')">Hedge</button>
+                        <button class="btn danger" onclick="closePosition('${pos.position_id}')">Close</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+        
+        // Add log entry
+        function addLog(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = `[${timestamp}] ${message}`;
+            elements.activityLog.insertBefore(entry, elements.activityLog.firstChild);
+            
+            // Keep only last 50 entries
+            while (elements.activityLog.children.length > 50) {
+                elements.activityLog.removeChild(elements.activityLog.lastChild);
+            }
+        }
+        
+        // Check API status
+        async function checkApiStatus() {
+            try {
+                const response = await fetch(`${API_BASE}/health`);
+                if (response.ok) {
+                    elements.apiStatus.classList.remove('disconnected');
+                    elements.apiStatus.classList.add('connected');
+                    elements.apiText.textContent = 'Connected';
+                } else {
+                    throw new Error('API unhealthy');
+                }
+            } catch (e) {
+                elements.apiStatus.classList.remove('connected');
+                elements.apiStatus.classList.add('disconnected');
+                elements.apiText.textContent = 'Disconnected';
+            }
+        }
+        
+        // Place trade
+        async function placeTrade(e) {
+            e.preventDefault();
+            
+            const tradeData = {
+                market_id: document.getElementById('market-id').value,
+                selection_id: document.getElementById('selection-id').value,
+                side: document.getElementById('side').value,
+                size: parseFloat(document.getElementById('size').value),
+                price: parseFloat(document.getElementById('price').value),
+                strategy: 'SMART'
+            };
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/trade/place`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(tradeData)
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    addLog(`Trade placed: ${tradeData.side} £${tradeData.size} @ ${tradeData.price}`, 'success');
+                    elements.tradeForm.reset();
+                } else {
+                    addLog(`Trade failed: ${result.message}`, 'error');
+                }
+            } catch (e) {
+                addLog(`Error placing trade: ${e.message}`, 'error');
+            }
+        }
+        
+        // Hedge position
+        async function hedgePosition(positionId) {
+            try {
+                const response = await fetch(`${API_BASE}/api/trade/hedge/${positionId}`, {
+                    method: 'POST'
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    addLog(`Position hedged: ${positionId}`, 'success');
+                } else {
+                    addLog(`Hedge failed: ${result.message}`, 'error');
+                }
+            } catch (e) {
+                addLog(`Error hedging position: ${e.message}`, 'error');
+            }
+        }
+        
+        // Close position
+        async function closePosition(positionId) {
+            if (!confirm('Are you sure you want to close this position?')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/trade/close`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ position_id: positionId })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    addLog(`Position closed: ${result.message}`, 'success');
+                } else {
+                    addLog(`Close failed: ${result.message}`, 'error');
+                }
+            } catch (e) {
+                addLog(`Error closing position: ${e.message}`, 'error');
+            }
+        }
+        
+        // Initialize
+        elements.tradeForm.addEventListener('submit', placeTrade);
+        
+        // Start connections
+        connectWebSocket();
+        checkApiStatus();
+        setInterval(checkApiStatus, 10000);
+        
+        addLog('Monitor initialized', 'success');
+    </script>
+</body>
+</html>

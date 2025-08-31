@@ -118,7 +118,12 @@ class ConnectionManager:
         exclude = exclude or set()
         
         # Prepare message once
-        message_dict = message.model_dump(mode='json')
+        if isinstance(message, dict):
+            message_dict = message
+        elif hasattr(message, 'model_dump'):
+            message_dict = message.model_dump(mode='json')
+        else:
+            message_dict = {"data": str(message)}
         
         # Send to all clients
         disconnected = []
