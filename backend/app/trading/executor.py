@@ -42,7 +42,9 @@ class TradeExecutor:
     def __init__(
         self,
         provider_manager: ProviderManager,
-        risk_limits: Optional[RiskLimits] = None
+        risk_limits: Optional[RiskLimits] = None,
+        position_tracker: Optional[Any] = None,  # Avoid circular import
+        risk_manager: Optional[Any] = None  # Avoid circular import
     ):
         """
         Initialize trade executor.
@@ -50,9 +52,13 @@ class TradeExecutor:
         Args:
             provider_manager: Provider manager for routing
             risk_limits: Risk management limits
+            position_tracker: Optional position tracker for P&L
+            risk_manager: Optional risk manager for limit enforcement
         """
         self.provider_manager = provider_manager
         self.risk_limits = risk_limits or RiskLimits()
+        self.position_tracker = position_tracker
+        self.risk_manager = risk_manager
         self.logger = logging.getLogger(self.__class__.__name__)
         
         # Order tracking
@@ -108,6 +114,16 @@ class TradeExecutor:
         if not is_valid:
             return self._create_error_report(instruction, error_msg)
         
+        # Check with risk manager if available
+        if self.risk_manager:
+            # Get current balance (would come from provider)
+            current_balance = Decimal("1000")  # Placeholder
+            is_allowed, rejection_reason = await self.risk_manager.check_trade(
+                instruction, current_balance
+            )
+            if not is_allowed:
+                return self._create_error_report(instruction, rejection_reason)
+        
         # Check for duplicates
         if self._is_duplicate(instruction):
             return self._create_error_report(instruction, "Duplicate order detected")
@@ -155,6 +171,19 @@ class TradeExecutor:
             self.total_orders += 1
             if report.is_successful:
                 self.successful_orders += 1
+                
+                # Track position if position tracker available
+                if self.position_tracker and report.executed_size > 0:
+                    await self.position_tracker.open_position(
+                        market_id=instruction.market_id,
+                        selection_id=instruction.selection_id,
+                        side=instruction.side,
+                        price=report.executed_price,
+                        size=report.executed_size,
+                        order_id=order.order_id,
+                        provider=provider or "betfair",
+                        strategy=instruction.strategy.value if instruction.strategy else None
+                    )
             else:
                 self.failed_orders += 1
             

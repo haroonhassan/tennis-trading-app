@@ -80,11 +80,17 @@ tennis-trading-app/
 │   │   │   ├── normalizer.py # Data normalization
 │   │   │   └── tennis_models.py # Tennis-specific models
 │   │   ├── server/         # FastAPI server and WebSocket
-│   │   └── trading/        # Trade execution engine
-│   │       ├── models.py   # Trading data models
-│   │       ├── executor.py # Trade executor with risk management
-│   │       ├── strategies.py # Execution strategies (Aggressive, Passive, TWAP, etc.)
-│   │       └── audit.py    # Trade event logging and compliance
+│   │   ├── trading/        # Trade execution engine
+│   │   │   ├── models.py   # Trading data models
+│   │   │   ├── executor.py # Trade executor with risk management
+│   │   │   ├── strategies.py # Execution strategies (Aggressive, Passive, TWAP, etc.)
+│   │   │   └── audit.py    # Trade event logging and compliance
+│   │   └── risk/           # Risk management system
+│   │       ├── models.py   # Risk data models (Position, RiskMetrics, etc.)
+│   │       ├── tracker.py  # Real-time position tracking
+│   │       ├── calculator.py # P&L and Greek calculations
+│   │       ├── manager.py  # Risk limits enforcement and kill switch
+│   │       └── persistence.py # SQLite database for positions
 │   ├── tests/              # Test suite
 │   └── requirements.txt    # Python dependencies
 ├── frontend/               # React frontend application
@@ -281,30 +287,70 @@ DataProviderFactory.register_provider("new_provider", NewProvider)
   - [x] Interactive CLI for testing (`scripts/trade_cli.py`)
   - [x] Real money order placement and cancellation (tested live)
 
-### 🚧 In Progress
+- [x] **Phase 6: Position Tracking & P&L (Completed)**
+  - [x] Real-time position monitoring across markets
+    - [x] PositionTracker for live position management
+    - [x] Automatic position updates on trade execution
+    - [x] Position reconciliation with provider records
+  - [x] P&L calculation (realized and unrealized)
+    - [x] PositionCalculator with commission handling
+    - [x] Real-time unrealized P&L updates
+    - [x] Daily P&L statements and reporting
+  - [x] Exposure management and hedging tools
+    - [x] Market exposure tracking and limits
+    - [x] Hedge requirement calculations
+    - [x] Automated hedge recommendations
+  - [x] Position history and performance analytics
+    - [x] SQLite persistence layer
+    - [x] Position audit trail
+    - [x] Performance metrics (win rate, avg win/loss)
+  - [x] Multi-market portfolio view
+    - [x] Aggregate exposure reporting
+    - [x] Portfolio-level risk metrics
 
-- [ ] **Phase 6: Position Tracking & P&L**
-  - [ ] Real-time position monitoring across markets
-  - [ ] P&L calculation (realized and unrealized)
-  - [ ] Exposure management and hedging tools
-  - [ ] Position history and performance analytics
-  - [ ] Multi-market portfolio view
+- [x] **Phase 7: Risk Management System (Completed)**
+  - [x] Comprehensive risk framework
+    - [x] RiskManager with configurable limits
+    - [x] Pre-trade risk validation
+    - [x] Real-time limit monitoring
+  - [x] Risk limits enforcement
+    - [x] Position size limits
+    - [x] Market exposure limits
+    - [x] Daily loss limits
+    - [x] Concentration limits
+  - [x] Kill switch functionality
+    - [x] Emergency trading freeze
+    - [x] Automatic trigger on limit breaches
+    - [x] Manual activation support
+  - [x] Greek calculations
+    - [x] Delta (price sensitivity)
+    - [x] Theta (time decay)
+    - [x] Portfolio-level Greeks
+  - [x] Risk alerts and notifications
+    - [x] Real-time risk alerts
+    - [x] Alert severity levels
+    - [x] Alert persistence and acknowledgment
+  - [x] Integration with trade execution
+    - [x] TradeExecutor risk integration
+    - [x] Automatic position tracking on fills
+
+### 🚧 In Progress
 
 ### 📋 Planned
 
-- [ ] **Phase 7: React Frontend**
+- [ ] **Phase 8: React Frontend**
   - [ ] Component architecture
   - [ ] Real-time data display
   - [ ] Trading interface
   - [ ] Performance dashboards
 
-- [ ] **Phase 8: Additional Providers**
+- [ ] **Phase 9: Additional Providers**
   - [ ] Pinnacle Sports integration
   - [ ] Smarkets provider
   - [ ] Betdaq support
   - [ ] Unified data model
 
-- [ ] **Phase 9: Advanced Features**
+- [ ] **Phase 10: Advanced Features**
   - [ ] Automated trading strategies
   - [ ] Backtesting framework
   - [ ] Advanced risk management
