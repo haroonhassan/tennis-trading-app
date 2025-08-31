@@ -283,13 +283,7 @@ DataProviderFactory.register_provider("new_provider", NewProvider)
 
 ### 🚧 In Progress
 
-- [ ] **Phase 6: Advanced Order Management**
-  - [ ] Order book visualization and depth analysis
-  - [ ] Complex order types (stop-loss, trailing stops, conditional orders)
-  - [ ] Order modification and partial fills handling
-  - [ ] Queue position estimation
-  
-- [ ] **Phase 7: Position Tracking & P&L**
+- [ ] **Phase 6: Position Tracking & P&L**
   - [ ] Real-time position monitoring across markets
   - [ ] P&L calculation (realized and unrealized)
   - [ ] Exposure management and hedging tools
@@ -298,23 +292,28 @@ DataProviderFactory.register_provider("new_provider", NewProvider)
 
 ### 📋 Planned
 
-- [ ] **Phase 8: React Frontend**
+- [ ] **Phase 7: React Frontend**
   - [ ] Component architecture
   - [ ] Real-time data display
   - [ ] Trading interface
   - [ ] Performance dashboards
 
-- [ ] **Phase 9: Additional Providers**
+- [ ] **Phase 8: Additional Providers**
   - [ ] Pinnacle Sports integration
   - [ ] Smarkets provider
   - [ ] Betdaq support
   - [ ] Unified data model
 
-- [ ] **Phase 10: Advanced Features**
+- [ ] **Phase 9: Advanced Features**
   - [ ] Automated trading strategies
   - [ ] Backtesting framework
   - [ ] Advanced risk management
   - [ ] ML-based predictions
+  - [ ] Advanced order management
+    - [ ] Order book visualization and depth analysis
+    - [ ] Complex order types (stop-loss, trailing stops, conditional orders)
+    - [ ] Order modification and partial fills handling
+    - [ ] Queue position estimation
 
 ## Contributing
 
