@@ -377,6 +377,36 @@ Real-time streaming of all trading events:
 - Comprehensive event statistics
 - WebSocket message processing
 
+### Charts and Visualization (Prompt 16)
+
+#### Chart Types (F6)
+- **Line Charts**: Price movements and P&L trends with interpolation
+- **Bar Charts**: Volume analysis with positive/negative values
+- **Candlestick Charts**: OHLC price action visualization
+- **Heatmaps**: Correlation matrices with intensity coloring
+- **Sparklines**: Inline mini-charts for quick trends
+
+#### Chart Features
+- **ASCII Rendering**: Pure text-based charts for terminal display
+- **Real-time Animation**: Live updating charts with smooth transitions
+- **Normalization**: Automatic scaling to fit display area
+- **Multi-panel Dashboards**: Combined chart views
+- **Color Coding**: Visual distinction for bullish/bearish trends
+
+#### Dashboard Components
+- **P&L Chart**: Cumulative profit/loss over time
+- **Volume Chart**: Hourly trading volume analysis
+- **Price Chart**: Historical price movements with trend lines
+- **Position Heatmap**: P&L intensity by selection and time
+- **Mini Charts**: Sparkline-based compact visualizations
+
+#### Visualization Features
+- Responsive sizing for different terminal dimensions
+- Axis labels and grid lines
+- Trend indicators (up/down arrows)
+- Statistical overlays
+- Interactive chart updates
+
 ### Architecture
 ```
 terminal_app/
@@ -401,7 +431,8 @@ terminal_app/
     ├── help_menu.py       # Help menu and quick reference bar
     ├── risk_dashboard.py  # Risk management dashboard
     ├── automated_trading.py # Automated orders and smart execution
-    └── live_feed.py       # Live data feed and event streaming
+    ├── live_feed.py       # Live data feed and event streaming
+    └── charts.py          # ASCII charts and visualizations
 ```
 
 ## 📝 Logging
