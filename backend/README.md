@@ -347,6 +347,36 @@ Access the full risk management dashboard with F4 key:
 - Active alerts and warnings
 - Trading controls and kill switch
 
+### Live Data Feed (Prompt 15)
+
+#### Live Feed Panel (F5)
+Real-time streaming of all trading events:
+- **Event Types**: Trade, Position, Price, Score, Match, Alert, System, Error
+- **Priority System**: Critical events displayed first
+- **Event Filtering**: Filter by event type
+- **Pause/Resume**: Control feed streaming
+- **Auto-scroll**: Automatic scrolling to latest events
+- **Keyword Highlighting**: Highlight important terms
+
+#### Specialized Feeds
+- **Trade Feed**: Execution history with P&L tracking
+- **Score Feed**: Live match scores and server information
+- **Alert Feed**: Prioritized alerts with unread counts
+- **Statistics Panel**: Message rate, uptime, connection status
+
+#### Feed Management
+- **Message Routing**: Automatic routing to appropriate feeds
+- **Rate Calculation**: Real-time messages per second
+- **Event History**: Configurable buffer size
+- **Connection Monitoring**: Uptime and last message tracking
+
+#### Live Dashboard Features
+- Multi-panel layout with main feed and side panels
+- Real-time update without screen flicker
+- Color-coded events by type and priority
+- Comprehensive event statistics
+- WebSocket message processing
+
 ### Architecture
 ```
 terminal_app/
@@ -370,7 +400,8 @@ terminal_app/
     ├── layout_manager.py  # Multi-view layout manager
     ├── help_menu.py       # Help menu and quick reference bar
     ├── risk_dashboard.py  # Risk management dashboard
-    └── automated_trading.py # Automated orders and smart execution
+    ├── automated_trading.py # Automated orders and smart execution
+    └── live_feed.py       # Live data feed and event streaming
 ```
 
 ## 📝 Logging
