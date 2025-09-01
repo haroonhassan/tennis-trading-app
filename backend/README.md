@@ -25,7 +25,8 @@ Advanced tennis betting exchange trading system with integrated risk management,
 
 ### Real-Time Monitoring
 - **WebSocket Streaming**: Live updates for positions, trades, and P&L
-- **Dashboard Interface**: Web-based monitoring at `/static/monitor.html`
+- **Web Dashboard**: Browser-based monitoring at `/static/monitor.html`
+- **Terminal Interface**: Rich-based terminal UI for command-line trading
 - **Event Logging**: Comprehensive audit trail of all trading activity
 - **Performance Metrics**: Win rate, average P&L, and trade statistics
 
@@ -79,8 +80,20 @@ python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 ### Access Points
 - **API Documentation**: http://localhost:8000/docs
-- **Monitoring Dashboard**: http://localhost:8000/static/monitor.html
+- **Web Dashboard**: http://localhost:8000/static/monitor.html
 - **Health Check**: http://localhost:8000/health
+
+### Start the Terminal Interface
+```bash
+python terminal_app/app.py
+```
+
+The terminal interface provides:
+- Real-time market data display
+- Keyboard-driven trading
+- Position management
+- Risk monitoring
+- Live feed of trading events
 
 ## 📡 API Endpoints
 
@@ -199,12 +212,47 @@ Access at: http://localhost:8000/static/monitor.html
 - Rate limiting on API endpoints
 - Audit logging for compliance
 
+## 💻 Terminal Interface
+
+The Rich-based terminal interface (`terminal_app/`) provides a command-line trading experience:
+
+### Features
+- **Real-time Data**: Live market prices and score updates via WebSocket
+- **Keyboard Control**: Navigate and trade without mouse
+- **Position Tracking**: Monitor open positions and P&L
+- **Risk Dashboard**: Visual risk metrics and exposure tracking
+- **Trade Feed**: Live stream of trading events
+
+### Terminal Keyboard Shortcuts
+- `q` - Quit application
+- `r` - Refresh data
+- `b` - Place back bet
+- `l` - Place lay bet
+- `↑/k` - Move selection up
+- `↓/j` - Move selection down
+- `?/h` - Show help
+
+### Architecture
+```
+terminal_app/
+├── app.py              # Main application entry
+├── models.py           # Data models (Match, Position, Trade)
+├── websocket_client.py # WebSocket client with reconnection
+├── stores/             # Data management
+│   ├── match_store.py    # Match and price data
+│   ├── position_store.py # Position tracking
+│   └── trade_store.py    # Trade history
+└── components/         # UI components
+    └── layout.py       # Rich layout system
+```
+
 ## 📝 Logging
 
 Logs are written to:
 - `logs/app.log` - Application logs
 - `logs/trades.log` - Trade execution logs
 - `logs/risk.log` - Risk events
+- `terminal_app.log` - Terminal interface logs
 
 ## 🤝 Contributing
 
