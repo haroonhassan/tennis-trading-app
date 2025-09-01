@@ -244,45 +244,80 @@ The Rich-based terminal interface (`terminal_app/`) provides a command-line trad
 - **Stop Loss**: Set stop loss orders with max loss display
 - **Multi-View Layouts**: Switch between trading, positions, split, and risk views
 
-### Terminal Keyboard Shortcuts
+### Keyboard Navigation & Hotkeys (Prompt 13)
+
+#### Comprehensive Navigation
+- **Arrow Keys & Vim Keys**: Full navigation support with ↑↓←→ and hjkl
+- **Page Navigation**: Page Up/Down for fast scrolling, Home/End for jump to top/bottom
+- **Tab Cycling**: Tab key to switch between panels and active areas
+- **Search Mode**: `/` to enter search/filter mode with real-time results
+
+#### Input Mode Management
+- **Normal Mode**: Default mode for navigation and trading
+- **Search Mode**: Activated with `/` for filtering matches and selections
+- **Confirm Mode**: Y/N prompts for critical actions
+- **Help Mode**: `?` to show comprehensive help menu
 
 #### Navigation & Views
-- `F1` - Full trading grid view
-- `F2` - Full positions view with P&L ladder
+- `F1` - Trading grid view
+- `F2` - Positions view with P&L ladder
 - `F3` - Split screen (grid + positions)
 - `F4` - Risk dashboard
-- `Tab` - Switch active pane in split view
+- `F5` - Live trading feed
+- `F6` - Charts view
+- `Tab` - Switch active pane/panel
 - `↑/↓` or `j/k` - Navigate up/down
-- `Page Up/Down` - Fast navigation
+- `←/→` or `h/l` - Navigate left/right
+- `Page Up/Down` - Fast scroll
+- `Home/End` - Jump to top/bottom
+- `/` - Search/filter
 
-#### Trading
+#### Trading Hotkeys
 - `b` - Place back bet on selection
-- `l` - Place lay bet on selection
+- `l` - Place lay bet on selection (context-aware with navigation)
 - `1-5` - Quick stake selection (£10/25/50/100/250)
-- `Y/N` - Confirm/cancel in modals
-- `+/-` - Adjust price in bet modal
-- `ESC` - Cancel modal/action
+- `+/-` - Adjust stake or price
+- `Enter` - Confirm action
+- `Y/N` - Yes/No in confirmation dialogs
+- `ESC` - Cancel/close modal
 
 #### Position Management
 - `c` - Close position at market
-- `h` - Hedge position (green up)
+- `h` - Hedge position (context-aware with navigation)
 - `x` - Set stop loss
 - `t` - Set take profit
-- `s` - Cycle sort column
-- `Shift+S` - Toggle sort direction
+- `s` - Sort positions
+- `o` - Toggle odds format (decimal/fractional)
+- `p` - Toggle positions-only view
 
-#### System
+#### Advanced Shortcuts
+- `Shift+C` - Close ALL positions (with confirmation)
+- `Shift+H` - Hedge ALL positions (with confirmation)
+- `Shift+S` - KILL SWITCH - Emergency stop all trading
+- `Ctrl+Z` - Undo last action (maintains undo stack)
+
+#### System Controls
 - `r` - Refresh all data
-- `?` or `h` - Show help
+- `?` - Show help menu with all shortcuts
 - `q` - Quit application
+- `Ctrl+C` - Force quit
+
+#### Context-Aware Actions
+- **Smart Key Conflicts**: Navigation keys (h/l) automatically switch context between navigation and trading actions
+- **Mode Indicators**: Visual feedback showing current input mode
+- **Quick Reference Bar**: Bottom bar showing available actions for current context
+- **Help Menu**: Organized by category with visual grouping
 
 ### Architecture
 ```
 terminal_app/
 ├── app.py              # Main application entry
 ├── app_v2.py           # Enhanced app with trading grid
+├── app_v3.py           # Full app with keyboard navigation
 ├── models.py           # Data models (Match, Position, Trade)
 ├── websocket_client.py # WebSocket client with reconnection
+├── keyboard_handler.py # Comprehensive keyboard input handling
+├── keyboard_handler_fixed.py # Fixed version with proper filters
 ├── stores/             # Data management
 │   ├── match_store.py    # Match and price data
 │   ├── position_store.py # Position tracking
@@ -293,7 +328,8 @@ terminal_app/
     ├── bet_modal.py       # Bet placement modal
     ├── positions_panel.py # Position management panel
     ├── position_modals.py # Close/hedge/stop-loss modals
-    └── layout_manager.py  # Multi-view layout manager
+    ├── layout_manager.py  # Multi-view layout manager
+    └── help_menu.py       # Help menu and quick reference bar
 ```
 
 ## 📝 Logging
