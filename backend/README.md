@@ -218,24 +218,40 @@ The Rich-based terminal interface (`terminal_app/`) provides a command-line trad
 
 ### Features
 - **Real-time Data**: Live market prices and score updates via WebSocket
-- **Keyboard Control**: Navigate and trade without mouse
-- **Position Tracking**: Monitor open positions and P&L
+- **Trading Grid**: Interactive table with real-time odds and positions
+- **One-Click Betting**: Quick bet placement with keyboard shortcuts
+- **Bet Modal**: Detailed bet confirmation with P&L calculations
+- **Price Flashing**: Visual indicators for price movements (green up/red down)
+- **Position Tracking**: Monitor open positions with live P&L
 - **Risk Dashboard**: Visual risk metrics and exposure tracking
-- **Trade Feed**: Live stream of trading events
+- **Trade Feed**: Live stream of trading events with color coding
+
+### Trading Grid Features
+- **Real-time Updates**: Prices update without screen flicker
+- **Selection Highlighting**: Current row highlighted in cyan
+- **Serving Indicator**: • symbol shows current server
+- **Position Markers**: € symbol indicates open positions
+- **P&L Display**: Color-coded profit/loss for each position
+- **Volume Display**: Formatted as 1k, 2.5k for readability
+- **Stale Price Detection**: Dims prices older than 5 seconds
 
 ### Terminal Keyboard Shortcuts
+- `↑/↓` or `j/k` - Navigate up/down in grid
+- `b` - Place back bet on selection
+- `l` - Place lay bet on selection
+- `1-5` - Quick stake selection (£10/25/50/100/250)
+- `Y/N` - Confirm/cancel bet in modal
+- `+/-` - Adjust price in bet modal
+- `r` - Refresh all data
+- `?` or `h` - Show help
 - `q` - Quit application
-- `r` - Refresh data
-- `b` - Place back bet
-- `l` - Place lay bet
-- `↑/k` - Move selection up
-- `↓/j` - Move selection down
-- `?/h` - Show help
+- `ESC` - Cancel modal/action
 
 ### Architecture
 ```
 terminal_app/
 ├── app.py              # Main application entry
+├── app_v2.py           # Enhanced app with trading grid
 ├── models.py           # Data models (Match, Position, Trade)
 ├── websocket_client.py # WebSocket client with reconnection
 ├── stores/             # Data management
@@ -243,7 +259,9 @@ terminal_app/
 │   ├── position_store.py # Position tracking
 │   └── trade_store.py    # Trade history
 └── components/         # UI components
-    └── layout.py       # Rich layout system
+    ├── layout.py       # Rich layout system
+    ├── trading_grid.py # Trading grid with selection
+    └── bet_modal.py    # Bet placement modal
 ```
 
 ## 📝 Logging
