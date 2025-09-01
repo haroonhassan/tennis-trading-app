@@ -407,6 +407,40 @@ Real-time streaming of all trading events:
 - Statistical overlays
 - Interactive chart updates
 
+### Settings and Configuration (Prompt 17)
+
+#### Configuration System
+- **Persistent Settings**: JSON-based configuration storage
+- **Multiple Sections**: General, Trading, Display, Risk, Automation, Keyboard, Connection
+- **Type Safety**: Dataclass-based configuration with validation
+- **Path-based Access**: Get/set values using dot notation
+- **Import/Export**: Save and load configurations
+- **Validation**: Automatic validation of settings
+
+#### Settings Categories
+- **General**: App name, version, auto-save, logging, theme
+- **Trading**: Stakes, odds limits, commission, confirmations
+- **Display**: Refresh rate, precision, formats, visual options
+- **Risk**: Exposure limits, stop loss, take profit, kill switch
+- **Automation**: Auto-hedge, auto-close, smart execution
+- **Keyboard**: Shortcuts, vim mode, function keys
+- **Connection**: WebSocket, API URLs, reconnection settings
+
+#### Settings UI Features
+- **Settings Panel**: Full configuration interface
+- **Section Navigation**: Browse all settings categories
+- **Quick Settings**: Compact view of key settings
+- **Live Editing**: Modify settings on the fly
+- **Reset Options**: Reset section or all to defaults
+- **Validation Display**: Show configuration issues
+
+#### Configuration Management
+- Auto-save functionality
+- Default values for all settings
+- Section-based organization
+- JSON and YAML export formats
+- Configuration profiles support
+
 ### Architecture
 ```
 terminal_app/
@@ -417,6 +451,7 @@ terminal_app/
 ├── websocket_client.py # WebSocket client with reconnection
 ├── keyboard_handler.py # Comprehensive keyboard input handling
 ├── keyboard_handler_fixed.py # Fixed version with proper filters
+├── config.py           # Configuration management system
 ├── stores/             # Data management
 │   ├── match_store.py    # Match and price data
 │   ├── position_store.py # Position tracking
@@ -432,7 +467,8 @@ terminal_app/
     ├── risk_dashboard.py  # Risk management dashboard
     ├── automated_trading.py # Automated orders and smart execution
     ├── live_feed.py       # Live data feed and event streaming
-    └── charts.py          # ASCII charts and visualizations
+    ├── charts.py          # ASCII charts and visualizations
+    └── settings_ui.py     # Settings UI components
 ```
 
 ## 📝 Logging
