@@ -84,8 +84,38 @@ python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 - **Health Check**: http://localhost:8000/health
 
 ### Start the Terminal Interface
+
+#### Quick Start
 ```bash
+# Run the complete integrated terminal
+python terminal_app/app_final.py
+```
+
+#### Alternative Versions
+```bash
+# Basic version
 python terminal_app/app.py
+
+# Enhanced with trading grid
+python terminal_app/app_v2.py
+
+# With full keyboard navigation
+python terminal_app/app_v3.py
+```
+
+### Test the Application
+```bash
+# Test complete integration
+python test_complete_app.py
+
+# Test individual components
+python test_trading_grid.py
+python test_positions_panel.py
+python test_keyboard_navigation.py
+python test_risk_dashboard.py
+python test_live_feed.py
+python test_charts.py
+python test_settings.py
 ```
 
 The terminal interface provides:
@@ -94,6 +124,125 @@ The terminal interface provides:
 - Position management
 - Risk monitoring
 - Live feed of trading events
+- Charts and visualizations
+- Settings management
+- Automated trading features
+
+## 🔴 Live Data Testing Guide
+
+### Prerequisites for Live Data
+1. **WebSocket Server**: Ensure your WebSocket server is running and accessible
+2. **API Credentials**: Have your Betfair/exchange credentials configured in `.env`
+3. **Network Access**: Verify connectivity to data providers
+4. **Test Environment**: Use test/sandbox environment first before production
+
+### Step 1: Configure Live Data Connection
+```bash
+# Edit configuration file
+vim terminal_app/config.json
+
+# Or use environment variables
+export WEBSOCKET_URL="wss://your-websocket-server.com/live"
+export API_BASE_URL="https://your-api-server.com/api"
+```
+
+### Step 2: Start Backend Services
+```bash
+# Start API server with live data providers
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+
+# In another terminal, start WebSocket relay (if needed)
+python scripts/websocket_relay.py
+```
+
+### Step 3: Launch Terminal with Live Data
+```bash
+# Start with live WebSocket connection
+python terminal_app/app_final.py --live
+
+# Or with custom WebSocket URL
+python terminal_app/app_final.py --ws-url "wss://your-server.com/live"
+```
+
+### Step 4: Verify Live Data Flow
+1. **Check Connection Status**: Look for "Connected to WebSocket" message
+2. **Monitor Feed Panel**: Press F5 to view live data feed
+3. **Verify Price Updates**: Check trading grid (F1) for live price changes
+4. **Test Match Updates**: Ensure scores and match status update in real-time
+
+### Step 5: Test Trading Functions with Live Data
+```bash
+# Test order placement (paper trading mode first)
+1. Navigate to a selection with arrow keys
+2. Press 'b' for back bet or 'l' for lay bet
+3. Select stake with number keys (1-5)
+4. Confirm with 'Y'
+
+# Test position management
+1. Place a test bet
+2. Press F2 to view positions
+3. Press 'c' to close or 'h' to hedge
+4. Monitor P&L updates in real-time
+```
+
+### Troubleshooting Live Data Issues
+
+#### WebSocket Connection Issues
+```bash
+# Check WebSocket connectivity
+python scripts/test_websocket.py
+
+# Enable debug logging
+export LOG_LEVEL=DEBUG
+python terminal_app/app_final.py
+```
+
+#### Data Not Updating
+- Check network connectivity: `ping your-server.com`
+- Verify WebSocket URL in config
+- Check for firewall/proxy issues
+- Review logs in `terminal_app.log`
+
+#### Authentication Failures
+- Verify API credentials in `.env`
+- Check certificate paths for Betfair
+- Ensure API keys are active
+- Test with curl: `curl -H "X-API-Key: YOUR_KEY" https://api-endpoint`
+
+### Live Data Checklist
+- [ ] WebSocket server is accessible
+- [ ] API credentials are configured
+- [ ] Network connectivity verified
+- [ ] Test environment selected (not production)
+- [ ] Logging enabled for debugging
+- [ ] Paper trading mode for initial tests
+- [ ] Risk limits configured appropriately
+- [ ] Kill switch tested (Shift+S)
+- [ ] Data feed showing in F5 view
+- [ ] Prices updating in trading grid
+- [ ] Positions tracking correctly
+- [ ] P&L calculations accurate
+
+### Performance Monitoring with Live Data
+```bash
+# Monitor system resources
+top -p $(pgrep -f app_final.py)
+
+# Check message throughput
+tail -f terminal_app.log | grep "msg/s"
+
+# Monitor WebSocket latency
+python scripts/measure_latency.py
+```
+
+### Safety Features for Live Trading
+1. **Paper Trading Mode**: Test without real money first
+2. **Risk Limits**: Configure conservative limits initially
+3. **Kill Switch**: Practice using Shift+S emergency stop
+4. **Daily Loss Limit**: Set appropriate daily loss threshold
+5. **Position Limits**: Start with small position counts
+6. **Confirmation Dialogs**: Keep enabled for all trades
+7. **Audit Logging**: Review logs regularly
 
 ## 📡 API Endpoints
 
@@ -441,12 +590,33 @@ Real-time streaming of all trading events:
 - JSON and YAML export formats
 - Configuration profiles support
 
+### Final Integration (Prompt 18)
+
+The complete terminal trading application brings together all components into a polished, production-ready system:
+
+#### Integrated Features
+- **Unified Application**: All components working together seamlessly
+- **Complete Keyboard Control**: Full navigation and trading via keyboard
+- **Real-time Updates**: Live data streaming with WebSocket integration
+- **Risk Management**: Integrated limits, alerts, and kill switch
+- **Automated Trading**: Stop loss, take profit, and smart execution
+- **Multi-view System**: F1-F6 keys for instant view switching
+- **Settings Persistence**: Configuration saved and loaded automatically
+- **Session Statistics**: Real-time P&L, win rate, and performance tracking
+
+#### Application Versions
+- `app.py`: Basic terminal foundation
+- `app_v2.py`: Enhanced with trading grid
+- `app_v3.py`: Full keyboard navigation
+- `app_final.py`: Complete integrated application
+
 ### Architecture
 ```
 terminal_app/
 ├── app.py              # Main application entry
 ├── app_v2.py           # Enhanced app with trading grid
 ├── app_v3.py           # Full app with keyboard navigation
+├── app_final.py        # Complete integrated application
 ├── models.py           # Data models (Match, Position, Trade)
 ├── websocket_client.py # WebSocket client with reconnection
 ├── keyboard_handler.py # Comprehensive keyboard input handling
