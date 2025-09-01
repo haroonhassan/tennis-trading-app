@@ -235,17 +235,46 @@ The Rich-based terminal interface (`terminal_app/`) provides a command-line trad
 - **Volume Display**: Formatted as 1k, 2.5k for readability
 - **Stale Price Detection**: Dims prices older than 5 seconds
 
+### Position Management Features
+- **Positions Table**: Sortable view of all open positions with P&L
+- **P&L Ladder**: Visual chart showing profit/loss at different price points
+- **Position Summary**: Total exposure, realized/unrealized P&L, best/worst trades
+- **Close Position**: One-click position closure with P&L calculation
+- **Hedge/Green-up**: Automatic hedge calculation for guaranteed profit
+- **Stop Loss**: Set stop loss orders with max loss display
+- **Multi-View Layouts**: Switch between trading, positions, split, and risk views
+
 ### Terminal Keyboard Shortcuts
-- `↑/↓` or `j/k` - Navigate up/down in grid
+
+#### Navigation & Views
+- `F1` - Full trading grid view
+- `F2` - Full positions view with P&L ladder
+- `F3` - Split screen (grid + positions)
+- `F4` - Risk dashboard
+- `Tab` - Switch active pane in split view
+- `↑/↓` or `j/k` - Navigate up/down
+- `Page Up/Down` - Fast navigation
+
+#### Trading
 - `b` - Place back bet on selection
 - `l` - Place lay bet on selection
 - `1-5` - Quick stake selection (£10/25/50/100/250)
-- `Y/N` - Confirm/cancel bet in modal
+- `Y/N` - Confirm/cancel in modals
 - `+/-` - Adjust price in bet modal
+- `ESC` - Cancel modal/action
+
+#### Position Management
+- `c` - Close position at market
+- `h` - Hedge position (green up)
+- `x` - Set stop loss
+- `t` - Set take profit
+- `s` - Cycle sort column
+- `Shift+S` - Toggle sort direction
+
+#### System
 - `r` - Refresh all data
 - `?` or `h` - Show help
 - `q` - Quit application
-- `ESC` - Cancel modal/action
 
 ### Architecture
 ```
@@ -259,9 +288,12 @@ terminal_app/
 │   ├── position_store.py # Position tracking
 │   └── trade_store.py    # Trade history
 └── components/         # UI components
-    ├── layout.py       # Rich layout system
-    ├── trading_grid.py # Trading grid with selection
-    └── bet_modal.py    # Bet placement modal
+    ├── layout.py          # Rich layout system
+    ├── trading_grid.py    # Trading grid with selection
+    ├── bet_modal.py       # Bet placement modal
+    ├── positions_panel.py # Position management panel
+    ├── position_modals.py # Close/hedge/stop-loss modals
+    └── layout_manager.py  # Multi-view layout manager
 ```
 
 ## 📝 Logging
