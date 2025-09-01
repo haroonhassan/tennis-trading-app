@@ -308,6 +308,45 @@ The Rich-based terminal interface (`terminal_app/`) provides a command-line trad
 - **Quick Reference Bar**: Bottom bar showing available actions for current context
 - **Help Menu**: Organized by category with visual grouping
 
+### Risk Management Dashboard (Prompt 14)
+
+#### Real-Time Risk Metrics
+- **Exposure Tracking**: Monitor total exposure, market exposure, and position counts
+- **P&L Monitoring**: Track daily P&L with warning thresholds
+- **Risk Limits**: Configurable limits for position size, market exposure, and daily loss
+- **Visual Indicators**: Color-coded usage bars showing risk utilization
+- **Alert System**: Multi-level alerts (warning/critical) for approaching limits
+
+#### Automated Trading Features
+- **Stop Loss Orders**: Automatic stop loss at configurable percentage
+- **Take Profit Orders**: Target profit levels with partial closing options
+- **Trailing Stops**: Dynamic stop loss that follows favorable price movements
+- **One-Cancels-Other (OCO)**: Paired stop loss and take profit orders
+- **Smart Execution**: Multiple execution strategies (Market, Limit, Iceberg, TWAP, VWAP)
+
+#### Risk Controls
+- **Kill Switch**: Emergency stop for all trading activity (Shift+S)
+- **Trading Freeze**: Temporary pause on new positions
+- **Position Limits**: Maximum concurrent positions enforcement
+- **Exposure Limits**: Per-market and total exposure caps
+- **Daily Loss Limits**: Automatic freeze when daily loss threshold reached
+
+#### Dashboard Components
+- **Risk Metrics Panel**: Current vs limit with visual usage bars
+- **Exposure Breakdown**: By market and selection with risk levels
+- **Alerts Panel**: Active warnings and critical alerts
+- **Trading Controls**: Kill switch, freeze status, auto stop-loss settings
+- **Performance Metrics**: Win rate, P&L stats, best/worst trades
+- **Automated Orders Panel**: Active stop loss, take profit, and trailing orders
+
+#### Risk Dashboard View (F4)
+Access the full risk management dashboard with F4 key:
+- Real-time risk score and metrics
+- Exposure visualization by market/selection
+- P&L tracking and performance analytics
+- Active alerts and warnings
+- Trading controls and kill switch
+
 ### Architecture
 ```
 terminal_app/
@@ -329,7 +368,9 @@ terminal_app/
     ├── positions_panel.py # Position management panel
     ├── position_modals.py # Close/hedge/stop-loss modals
     ├── layout_manager.py  # Multi-view layout manager
-    └── help_menu.py       # Help menu and quick reference bar
+    ├── help_menu.py       # Help menu and quick reference bar
+    ├── risk_dashboard.py  # Risk management dashboard
+    └── automated_trading.py # Automated orders and smart execution
 ```
 
 ## 📝 Logging

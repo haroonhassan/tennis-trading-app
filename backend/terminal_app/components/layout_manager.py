@@ -1,7 +1,7 @@
 """Layout manager for multi-window support."""
 
 from enum import Enum
-from typing import Optional
+from typing import Optional, List
 
 from rich.layout import Layout
 from rich.panel import Panel
@@ -12,6 +12,8 @@ from rich.columns import Columns
 from .trading_grid import TradingGrid
 from .positions_panel import PositionsPanel
 from .layout import AppLayout
+from .risk_dashboard import RiskDashboard
+from ..models import Position, Trade
 
 
 class ViewMode(Enum):
@@ -29,13 +31,19 @@ class LayoutManager:
         self,
         app_layout: AppLayout,
         trading_grid: TradingGrid,
-        positions_panel: PositionsPanel
+        positions_panel: PositionsPanel,
+        risk_dashboard: Optional[RiskDashboard] = None
     ):
         self.app_layout = app_layout
         self.trading_grid = trading_grid
         self.positions_panel = positions_panel
+        self.risk_dashboard = risk_dashboard or RiskDashboard()
         self.current_mode = ViewMode.TRADING
         self.active_pane = 0  # 0 = left/top, 1 = right/bottom
+        
+        # Data for risk dashboard
+        self._positions: List[Position] = []
+        self._trades: List[Trade] = []
     
     def create_layout(self) -> Layout:
         """Create layout based on current mode."""
@@ -129,84 +137,8 @@ class LayoutManager:
     
     def _create_risk_layout(self) -> Layout:
         """Create risk dashboard layout."""
-        from rich.table import Table
-        from rich.text import Text
-        from rich.progress import Progress, BarColumn, TextColumn
-        
-        # Create risk overview
-        risk_table = Table.grid(padding=1, expand=True)
-        risk_table.add_column(justify="right", style="cyan")
-        risk_table.add_column(justify="left")
-        
-        # Mock risk data for now
-        risk_table.add_row("Risk Score:", Text("35/100", style="green"))
-        risk_table.add_row("Daily P&L:", Text("+£45.50", style="green"))
-        risk_table.add_row("Exposure:", Text("£250/£1000", style="yellow"))
-        risk_table.add_row("Positions:", Text("3/20", style="white"))
-        
-        # Create exposure bars
-        exposure_bars = Table(title="Exposure by Market", box=None)
-        exposure_bars.add_column("Market", style="cyan")
-        exposure_bars.add_column("Exposure", width=30)
-        exposure_bars.add_column("Amount", justify="right")
-        
-        # Add sample bars
-        markets = [
-            ("Djokovic vs Federer", 0.3, "£30"),
-            ("Nadal vs Murray", 0.5, "£50"),
-            ("Alcaraz vs Sinner", 0.2, "£20")
-        ]
-        
-        for market, pct, amount in markets:
-            bar_len = int(pct * 20)
-            bar = "█" * bar_len + "░" * (20 - bar_len)
-            color = "red" if pct > 0.7 else "yellow" if pct > 0.4 else "green"
-            exposure_bars.add_row(
-                market,
-                Text(bar, style=color),
-                Text(amount, style=color)
-            )
-        
-        # Create P&L chart (ASCII)
-        pnl_chart = Panel(
-            Text(
-                "     £\n"
-                "  50 │     ╭─╮\n"
-                "  40 │    ╱  ╰╮\n"
-                "  30 │   ╱    ╰─╮\n"
-                "  20 │  ╱       ╰╮\n"
-                "  10 │ ╱         ╰─╮\n"
-                "   0 ├─────────────╯─\n"
-                " -10 │\n"
-                "     └────────────────\n"
-                "      9am  12pm  3pm  6pm",
-                style="cyan"
-            ),
-            title="Daily P&L",
-            border_style="blue"
-        )
-        
-        # Combine into layout
-        layout = Layout()
-        layout.split_row(
-            Layout(
-                Panel(risk_table, title="Risk Overview", border_style="yellow"),
-                name="overview",
-                ratio=1
-            ),
-            Layout(name="middle", ratio=1),
-            Layout(pnl_chart, name="chart", ratio=1)
-        )
-        
-        layout["middle"].update(
-            Panel(exposure_bars, title="Market Exposure", border_style="yellow")
-        )
-        
-        return Panel(
-            layout,
-            title="[F4] Risk Dashboard",
-            border_style="green"
-        )
+        # Use the actual risk dashboard component
+        return self.risk_dashboard.create_dashboard(self._positions, self._trades)
     
     def switch_mode(self, mode: ViewMode):
         """Switch to a different view mode."""
@@ -227,3 +159,10 @@ class LayoutManager:
             ViewMode.RISK: "[F4] Risk"
         }
         return indicators.get(self.current_mode, "Unknown")
+    
+    def update_data(self, positions: List[Position] = None, trades: List[Trade] = None):
+        """Update positions and trades data for risk dashboard."""
+        if positions is not None:
+            self._positions = positions
+        if trades is not None:
+            self._trades = trades
